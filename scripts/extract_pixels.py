@@ -51,7 +51,7 @@ def process_tile(args):
 
     lons, lats = transformer.transform(x, y)
 
-    return np.float32(lons), np.float32(lats), np.float32(pop)
+    return np.float32(lons), np.float32(lats), np.float32(pop), np.float32(x), np.float32(y)
 
 
 def main():
@@ -63,16 +63,18 @@ def main():
     n_tiles = len(tile_args)
     print(f"Processing {n_tiles:,} tiles across {WORKERS} workers...")
 
-    lons_list, lats_list, pop_list = [], [], []
+    lons_list, lats_list, pop_list, x_list, y_list = [], [], [], [], []
     total_px = 0
 
     with ThreadPoolExecutor(max_workers=WORKERS) as executor:
         for i, result in enumerate(executor.map(process_tile, tile_args), 1):
             if result is not None:
-                lons, lats, pop = result
+                lons, lats, pop, x, y = result
                 lons_list.append(lons)
                 lats_list.append(lats)
                 pop_list.append(pop)
+                x_list.append(x)
+                y_list.append(y)
                 total_px += len(pop)
             if i % 100 == 0:
                 print(f"  {i}/{n_tiles} tiles  |  {total_px:,} pixels so far")
@@ -81,9 +83,11 @@ def main():
     print("Concatenating and saving...")
     np.savez_compressed(
         OUT_PATH,
-        lons = np.concatenate(lons_list),
-        lats = np.concatenate(lats_list),
-        pop  = np.concatenate(pop_list),
+        lons   = np.concatenate(lons_list),
+        lats   = np.concatenate(lats_list),
+        pop    = np.concatenate(pop_list),
+        x_moll = np.concatenate(x_list),
+        y_moll = np.concatenate(y_list),
     )
     print(f"Saved to {OUT_PATH}")
 
