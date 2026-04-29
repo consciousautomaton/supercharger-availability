@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Data files — too large for git
+data/*.tif
+data/*.csv
+data/*.json
+data/*.npy
+data/*.bin
+data/*.xlsx
+
+# Computed outputs
+*.bin
+*.npy
+
+# Claude session data
+.claude/
