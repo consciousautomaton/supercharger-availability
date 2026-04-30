@@ -2,7 +2,7 @@
 
 **Question:** What fraction of humanity lives within X km of a Tesla supercharger?
 
-**Goal:** Interactive web app — a map where you set a radius and see the world's populated areas light up near superchargers, with live population stats globally, per country, and for the current viewport.
+**Goal:** Interactive web app — a map where you set a radius and see the world's populated areas light up near superchargers, with live population stats globally and for the current viewport.
 
 ## Hardware & Environment
 
@@ -13,10 +13,26 @@
 
 ---
 
+## Running the app
+
+**Backend** (from project root):
+```powershell
+.venv/Scripts/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+**Frontend** (from project root):
+```powershell
+.venv/Scripts/python -m http.server 8001 --directory frontend
+```
+
+Then open `http://127.0.0.1:8001/index.html`.
+
+---
+
 ## Data Pipeline (scripts run in order)
 
 ### 1. `scripts/extract_pixels.py` → `data/populated_pixels.npz`
-Reads the GHS-POP 2030 TIF in 4096×4096 tiles across 14 CPU threads. Filters for population ≥ 1.0. Converts each pixel centre from Mollweide to WGS84 via pyproj. Saves 5 arrays.
+Reads the GHS-POP 2030 TIF in 4096×4096 tiles across 14 CPU threads. Filters for population ≥ 1.0. Converts each pixel centre from Mollweide to WGS84 via pyproj. Saves 5 arrays: `lons`, `lats`, `pop`, `x_moll`, `y_moll`.
 
 Runtime: ~2-3 min. Output: 1.99 GB.
 
@@ -34,8 +50,10 @@ Loads both intermediate files. Runs a float32 Vincenty CUDA kernel (one thread p
 
 Runtime: ~46 min. Output: 3.68 GB.
 
-### 4. `scripts/build_outputs.py` → `data/pop_cumulative.json` + `data/global_min_dist.bin`
-Post-processes `pixel_distances.npz` into frontend-ready formats. **Not yet run** — waiting to finalise frontend architecture first.
+### 4. `scripts/build_outputs.py` → `data/pop_cumulative.json`
+Post-processes `pixel_distances.npz`. Builds a 501-entry JSON array where `array[r]` = total world population within `r` km of a charger. Used by the `/coverage` endpoint for instant global stat lookups.
+
+Runtime: a few minutes. **Already run — do not re-run unless charger data changes.**
 
 ---
 
@@ -47,10 +65,11 @@ Post-processes `pixel_distances.npz` into frontend-ready formats. **Not yet run*
 | `tesla_scrape.json` | 13 MB | Raw Tesla API scrape, 21,553 locations. Scraped April 28 2026. |
 | `chargers.npz` | 109 KB | Arrays: `lats`, `lons` (float64). 7,854 entries. |
 | `populated_pixels.npz` | 2.51 GB | Arrays: `lons`, `lats`, `pop`, `x_moll`, `y_moll` (all float32). 370,272,898 entries. |
-| `pixel_distances.npz` | 3.68 GB | All of the above plus `min_dist_km` (float32). The single source of truth for the backend. |
+| `pixel_distances.npz` | 3.68 GB | All of the above plus `min_dist_km` (float32). Single source of truth for the backend. |
+| `pop_cumulative.json` | ~2 KB | 501-entry array. `array[r]` = world population within r km of a charger. |
 
 ### pixel_distances.npz schema
-Each index corresponds to one 100m × 100m populated cell:
+Each index = one 100m × 100m populated cell:
 
 | Array | Type | Description |
 |-------|------|-------------|
@@ -61,54 +80,59 @@ Each index corresponds to one 100m × 100m populated cell:
 | `x_moll` | float32 | Mollweide x coordinate, metres |
 | `y_moll` | float32 | Mollweide y coordinate, metres |
 
-`x_moll` and `y_moll` enable exact cell corner computation: corners are simply `(x±50, y±50)` in Mollweide space, projected to WGS84 via pyproj.
+**Note:** The backend only loads 4 arrays (`lons`, `lats`, `pop`, `min_dist_km`). `x_moll`/`y_moll` are not loaded — cell corners are approximated client-side from lat/lon arithmetic (sub-metre error, imperceptible).
 
 ---
 
 ## Architecture
 
-### Visualisation approach
-Each GHS-POP cell is rendered as its actual 100m × 100m square on the map. This is the natural unit — no resampling, no tile alignment issues. At zoom level 13 (~5km view), each cell is ~5 screen pixels. At zoom 15 (~1km view), each cell is ~20 screen pixels.
+### Backend (`backend/main.py`) — FastAPI
 
-The cells tile perfectly with no gaps (Mollweide→WGS84 is a bijection), but they are not rectangles in WGS84 — they are slightly curved quadrilaterals. The deviation from a rectangle is sub-metre, but we use exact corner computation anyway.
+Loads 4 arrays from `pixel_distances.npz` into RAM (~6 GB total including the lat sort index). Builds a lat-sort index at startup for fast spatial queries.
 
-### Frontend
-Leaflet map. For the current viewport, requests lit pixels from the backend. Renders each pixel as a coloured rectangle at its exact WGS84 position. Colour = population density. Visibility = `min_dist_km <= slider_radius`.
+**Spatial index:** `np.argsort(LATS)` → `SORTED_LATS` + `LAT_ORDER` (int32). Binary search with `np.searchsorted` narrows to the viewport latitude band instantly; then filter by lon + distance within that band.
 
-### Backend (FastAPI)
-Serves spatial queries against `pixel_distances.npz`. Key endpoint:
+**Endpoints:**
 
 ```
-GET /pixels?lat_min=52.3&lat_max=52.7&lon_min=13.1&lon_max=13.8&radius=20
+GET /coverage?radius=50
+```
+Returns global population covered at that radius. Instant lookup from `pop_cumulative.json`.
+
+```
+GET /pixels?lat_min=&lat_max=&lon_min=&lon_max=&radius=&zoom=&max_px=
+```
+Returns pixels in the viewport within `radius` km of a charger. Always returns native 100m cells (`agg=1` hardcoded). Has `lon_wrap()` to handle MapLibre bounding boxes that exceed ±180°. Response:
+```json
+{
+  "mode": "native",
+  "cell_m": 100,
+  "pixels": [{"lat": ..., "lon": ..., "pop": ...}, ...],
+  "count": 12345,
+  "truncated": false,
+  "viewport": {"pop_covered": ..., "pop_total": ..., "fraction": ...}
+}
 ```
 
-Returns: list of `(lon, lat, pop, min_dist_km, x_moll, y_moll)` for pixels in bounds where `min_dist_km <= radius`. Frontend draws each as a quadrilateral.
+The backend also has a fully implemented `aggregate_pixels()` function (for low-zoom supercell merging) but it is currently disabled — `agg` is hardcoded to 1 because aggregated cells looked bad visually.
 
-Also serves:
-- `GET /coverage?radius=X` → global population covered (from `pop_cumulative.json`, instant lookup)
-- `GET /coverage/bbox?...&radius=X` → population covered in current viewport
+### Frontend (`frontend/index.html`)
 
-### Population stat
-`pop_cumulative.json` — 501-entry JSON array. `array[50]` = total world population within 50km of a charger. Computed once by `build_outputs.py`. Slider reads this directly, no backend call needed.
+**Stack:** MapLibre GL JS (basemap) + deck.gl standalone (data layer).
 
----
+**Current rendering approach:** Two separate WebGL canvases stacked — MapLibre renders the dark CartoDB basemap, deck.gl renders the population cells on top. The browser compositor blends them. This works but has GPU compositor overhead.
 
-## Development Plan
+**Planned improvement:** Move deck.gl into MapLibre's WebGL context via `map.addLayer({ type: 'custom' })` — one canvas, no compositor overhead, better iGPU performance.
 
-**Phase 1 (current): Berlin prototype**
-- Extract Berlin pixels from `pixel_distances.npz` (lat 52.3–52.7, lon 13.1–13.8)
-- FastAPI backend serving Berlin data
-- Leaflet frontend with radius slider, cell rendering, local population stat
+**Cell rendering:** `deck.SolidPolygonLayer` with `SolidPolygonLayer`. Each cell is a 4-corner quad. Corners computed client-side:
+- `dlat = (cell_m/2) / 110540`
+- `dlon = (cell_m/2) / (111320 * cos(lat))`
 
-**Phase 2: Global**
-- Spatial index (KD-tree or PostGIS) over full 370M pixels
-- Backend serves any viewport at full 100m resolution
-- Global stat from `pop_cumulative.json`
+**Colour:** `sqrt(pop/maxPop)` → green intensity (denser = brighter).
 
-**Phase 3: Features**
-- Per-country coverage breakdown (Natural Earth polygons)
-- "Zoom to location" search
-- Population density layer always visible, coverage layer toggled by slider
+**Viewport sync:** `map.on('move', syncViewState)` fires at 60fps during pan to keep deck.gl's camera aligned with MapLibre. `map.on('resize', syncSize)` updates canvas dimensions.
+
+**Data fetch:** On `moveend`/`zoomend` (400ms debounce), fetches `/pixels` for the current viewport. Currently requests up to 1,000,000 cells.
 
 ---
 
@@ -117,7 +141,18 @@ Also serves:
 | Decision | Why |
 |----------|-----|
 | float32 Vincenty (not haversine) | More accurate near poles; float32 fast enough on consumer GPU |
-| Mollweide coordinates saved in npz | Enables exact cell corner projection without round-trip |
-| GHS-POP cells as render unit (not map tiles) | No resampling; 100m accuracy preserved at any zoom |
+| Backend loads only 4 of 6 arrays | x_moll/y_moll not needed — corners approximated client-side, saves ~3 GB RAM |
+| int32 sort index | Saves ~1.5 GB RAM vs int64 — 370M entries × 4 bytes vs 8 bytes |
+| Lat-sort + binary search spatial index | Fast, no extra RAM beyond the sorted index. KD-tree rejected (too much RAM). |
 | "party" type included in chargers | 2,062 valid open stations tagged this way in Tesla's API |
-| Backend spatial query (not static texture) | Enables true 100m resolution at any zoom level |
+| Native 100m cells only (no aggregation) | Aggregated cells at 200m–400m looked bad visually. Aggregation code exists but disabled. |
+| Two-canvas approach (MapLibre + deck.gl) | Works, but compositor overhead hits iGPU. Planned fix: shared GL context via MapLibre custom layer. |
+| lon_wrap() on bbox | MapLibre getBounds() can return longitudes outside ±180 at world-wrap boundaries |
+
+---
+
+## Next Steps
+
+1. **Shared GL context** — move deck.gl into MapLibre's WebGL context via `map.addLayer({ type: 'custom' })` to eliminate compositor overhead
+2. **Binary data format** — replace JSON response with raw `Float32Array` bytes; ~10x faster serialization + parsing
+3. **Global zoom** — re-enable aggregation at low zoom, but with a minimum agg factor of 4 (400m cells) so the visual quality is acceptable. Skip the 200m step entirely.
