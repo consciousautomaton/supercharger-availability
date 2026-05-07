@@ -97,7 +97,7 @@ loadAllStations()
   .catch((err) => {
     console.error("[v2] failed to load data:", err);
     if (statsEl) {
-      statsEl.innerHTML = `<p style="color:#ff6b6b">Data load failed: ${err instanceof Error ? err.message : String(err)}</p>`;
+      statsEl.innerHTML = `<p style="color:#c63131">Data load failed: ${err instanceof Error ? err.message : String(err)}</p>`;
     }
   });
 
