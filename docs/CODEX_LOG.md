@@ -36,6 +36,24 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-07 — Network catalog script
+
+What I did:
+- Added `v2/scripts/build_network_catalog.py` to group raw operator strings into canonical network groups for future UI filters.
+- Added typed frontend loading for `network_catalog.json`.
+- Ran the build successfully. Raw network labels: 11,786. Canonical entries: 11,706. The limited reduction is expected because most BNetzA labels are genuinely long-tail local operators.
+- Extended the data validator to check network catalog shape and duplicate IDs.
+
+Decisions:
+- Canonicalization is heuristic and non-destructive: grouped networks keep their top raw labels for auditability.
+- Long-tail raw labels remain separate `raw:*` canonical entries rather than being thrown into one opaque "Other" bucket. The UI can decide how aggressively to hide the tail.
+
+Skipped:
+- No visible network dropdown changes yet.
+
+Blocked:
+- Nothing expected.
+
 ## 2026-05-07 — Country catalog script
 
 What I did:

@@ -75,6 +75,7 @@ def main() -> int:
         [
             Step("EV stock ingest", "v2/scripts/ingest_iea_ev_stock.py"),
             Step("Station summary", "v2/scripts/build_station_summary.py"),
+            Step("Network catalog", "v2/scripts/build_network_catalog.py"),
         ]
     )
     if not args.skip_population:

@@ -2,6 +2,7 @@ import type {
   ChargerStation,
   CountryCatalog,
   EVStockCountryYear,
+  NetworkCatalog,
   PopulationGridMeta,
   StationSummary,
 } from "./types";
@@ -100,6 +101,15 @@ export async function loadCountryCatalog(): Promise<CountryCatalog | null> {
     return await fetchJson<CountryCatalog>("/data/country_catalog.json");
   } catch (err) {
     console.warn("Skipping country catalog:", err);
+    return null;
+  }
+}
+
+export async function loadNetworkCatalog(): Promise<NetworkCatalog | null> {
+  try {
+    return await fetchJson<NetworkCatalog>("/data/network_catalog.json");
+  } catch (err) {
+    console.warn("Skipping network catalog:", err);
     return null;
   }
 }

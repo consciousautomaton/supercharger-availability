@@ -123,3 +123,28 @@ export interface CountryCatalog {
   };
   countries: CountryCatalogEntry[];
 }
+
+export interface NetworkCatalogEntry {
+  id: string;
+  label: string;
+  station_count: number;
+  slow_count: number;
+  dc_fast_count: number;
+  ultra_count: number;
+  unknown_power_count: number;
+  with_open_date: number;
+  opened_by_year: Record<string, number>;
+  raw_label_count: number;
+  top_raw_labels: Array<{ label: string; station_count: number }>;
+}
+
+export interface NetworkCatalog {
+  meta: {
+    generated_at: string;
+    source: string;
+    raw_network_count: number;
+    canonical_network_count: number;
+    notes: string[];
+  };
+  networks: NetworkCatalogEntry[];
+}

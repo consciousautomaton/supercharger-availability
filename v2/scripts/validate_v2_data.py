@@ -250,12 +250,49 @@ def validate_country_catalog() -> int:
     return failures
 
 
+def validate_network_catalog() -> int:
+    path = DATA_DIR / "network_catalog.json"
+    if not path.exists():
+        print("Network catalog: missing optional network_catalog.json", file=sys.stderr)
+        return 0
+    data = load_json(path)
+    networks = data.get("networks") if isinstance(data, dict) else None
+    if not isinstance(networks, list):
+        print("Network catalog: ERROR missing networks array", file=sys.stderr)
+        return 1
+    failures = 0
+    seen: set[str] = set()
+    total = 0
+    for row in networks:
+        if not isinstance(row, dict):
+            failures += 1
+            continue
+        ident = row.get("id")
+        count = row.get("station_count")
+        if not isinstance(ident, str) or not ident:
+            failures += 1
+        elif ident in seen:
+            failures += 1
+        else:
+            seen.add(ident)
+        if not isinstance(count, int) or count < 0:
+            failures += 1
+        else:
+            total += count
+    print(
+        f"Network catalog: canonical={len(networks):,} total_station_refs={total:,} errors={failures:,}",
+        file=sys.stderr,
+    )
+    return failures
+
+
 def main() -> int:
     station_total, failures = validate_stations()
     failures += validate_ev_stock()
     failures += validate_station_summary(station_total)
     failures += validate_population_grid()
     failures += validate_country_catalog()
+    failures += validate_network_catalog()
     print(f"[done] station_total={station_total:,} failures={failures:,}", file=sys.stderr)
     return 1 if failures else 0
 
