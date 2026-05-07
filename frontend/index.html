@@ -2,230 +2,2132 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tesla Supercharger Coverage</title>
+  <title>Tesla Supercharger Access</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="https://unpkg.com/@maplibre/maplibre-gl-geocoder@1.5.0/dist/maplibre-gl-geocoder.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --red: #c9302c;
+      --red-soft: rgba(201, 48, 44, 0.85);
+      --red-glow: rgba(201, 48, 44, 0.18);
+      --paper: #f6f2ea;
+      --paper-strong: #fbf8f1;
+      --bg: rgba(247, 243, 235, 0.92);
+      --bg-strong: rgba(251, 248, 241, 0.96);
+      --hairline: rgba(40, 28, 20, 0.10);
+      --hairline-strong: rgba(40, 28, 20, 0.22);
+      --text: #1a1410;
+      --text-dim: #4f4338;
+      --text-faint: #8a7c6e;
+      --shadow: 0 12px 48px -12px rgba(40,28,20,0.22), 0 2px 6px rgba(40,28,20,0.08);
+      --scanlines:
+        repeating-linear-gradient(
+          90deg,
+          rgba(40,28,20,0.018) 0 1px,
+          transparent 1px 3px
+        );
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0a0a0a; color: #fff; font-family: sans-serif; }
+    html, body { height: 100%; }
+    body {
+      background: #efe9dc;
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-feature-settings: 'cv11', 'ss01', 'tnum';
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.005em;
+    }
 
     #map { width: 100vw; height: 100vh; }
 
-    #panel {
+    /* faint Animus scanlines + corner glow over the map */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(40,28,20,0.025) 0 1px,
+          transparent 1px 4px
+        ),
+        radial-gradient(ellipse at center, transparent 60%, rgba(40,28,20,0.10) 100%);
+      z-index: 999;
+      mix-blend-mode: multiply;
+    }
+
+    .map-panel {
       position: absolute;
-      top: 20px; left: 50%;
+      z-index: 1000;
+      background: var(--bg);
+      background-image: var(--scanlines);
+      border: 1px solid var(--hairline-strong);
+      border-radius: 4px;
+      padding: 18px 20px;
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      text-align: left;
+      backdrop-filter: blur(14px) saturate(110%);
+      -webkit-backdrop-filter: blur(14px) saturate(110%);
+      box-shadow: var(--shadow);
+      color: var(--text);
+    }
+    .map-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--red) 0%, var(--red) 38%, transparent 38%);
+      pointer-events: none;
+    }
+
+    /* left panel column: control + results stack with cap */
+    #panel-stack {
+      position: absolute;
+      z-index: 1000;
+      top: 20px;
+      left: 20px;
+      width: 360px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.16) transparent;
+    }
+    #panel-stack::-webkit-scrollbar { width: 6px; }
+    #panel-stack::-webkit-scrollbar-track { background: transparent; }
+    #panel-stack::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+    #panel-stack::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }
+    #panel-stack > .map-panel { position: relative; top: auto; left: auto; flex-shrink: 0; }
+
+    /* hero banner top center */
+    #hero {
+      position: absolute;
+      top: 20px;
+      left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
-      background: rgba(0,0,0,0.75);
-      border: 1px solid #333;
-      border-radius: 12px;
-      padding: 16px 24px;
-      min-width: 340px;
-      text-align: center;
-      backdrop-filter: blur(6px);
+      padding: 12px 26px 12px 32px;
+      background: var(--bg-strong);
+      background-image: var(--scanlines);
+      border: 1px solid var(--hairline-strong);
+      border-radius: 2px;
+      backdrop-filter: blur(14px) saturate(110%);
+      -webkit-backdrop-filter: blur(14px) saturate(110%);
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      white-space: nowrap;
+      animation: fadeInUp 0.6s ease-out 0.1s backwards;
+      pointer-events: none;
+      clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    }
+    #hero::before {
+      content: '';
+      position: absolute;
+      left: 12px; top: 50%;
+      transform: translateY(-50%) rotate(45deg);
+      width: 7px; height: 7px;
+      background: var(--red);
+      box-shadow: 0 0 0 2px rgba(201,48,44,0.18);
+    }
+    #hero-pct {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--red);
+      letter-spacing: -0.025em;
+      font-variant-numeric: tabular-nums;
+    }
+    #hero-text {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.02em;
+    }
+    #hero-text .strong { color: var(--text); font-weight: 600; }
+    @media (max-width: 820px) {
+      #hero { top: 12px; padding: 9px 16px; }
+      #hero-pct { font-size: 17px; }
+      #hero-text { font-size: 10px; }
     }
 
-    #panel h1 { font-size: 14px; font-weight: 400; color: #aaa; margin-bottom: 12px; letter-spacing: 0.05em; }
-    #radius-display { font-size: 32px; font-weight: 600; color: #e82127; margin-bottom: 4px; }
+    /* share button cluster top-right */
+    #toolbar {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 8px;
+      animation: fadeInUp 0.5s ease-out 0.2s backwards;
+    }
+    .toolbar-btn {
+      height: 38px;
+      padding: 0 16px;
+      border-radius: 2px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--bg);
+      background-image: var(--scanlines);
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      cursor: pointer;
+      backdrop-filter: blur(14px) saturate(110%);
+      -webkit-backdrop-filter: blur(14px) saturate(110%);
+      box-shadow: var(--shadow);
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-btn:hover {
+      color: var(--text);
+      border-color: var(--red);
+      background: rgba(201,48,44,0.08);
+    }
+    .toolbar-btn.copied {
+      color: #fff;
+      border-color: var(--red);
+      background: var(--red);
+    }
 
+    #legend-panel {
+      right: 20px;
+      bottom: 20px;
+      width: 260px;
+      padding: 14px 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* hero distance display */
+    .distance-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: baseline;
+      margin: 8px 0 4px;
+    }
+    #radius-display {
+      width: 100px;
+      border: 0;
+      background: transparent;
+      color: var(--red);
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      text-align: right;
+      outline: none;
+      font-variant-numeric: tabular-nums;
+      font-family: 'Inter', sans-serif;
+    }
+    #radius-display::-webkit-inner-spin-button,
+    #radius-display::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    #radius-display::-moz-focus-inner { border: 0; }
+    .distance-input-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .distance-unit {
+      color: var(--red);
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      opacity: 0.85;
+    }
+
+    /* slider — Animus diamond thumb */
     #slider {
+      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
-      accent-color: #e82127;
-      margin: 8px 0 14px;
+      height: 2px;
+      background: rgba(40,28,20,0.18);
+      border-radius: 0;
+      outline: none;
+      margin: 16px 0 8px;
+      cursor: pointer;
+    }
+    #slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--red);
+      border: 0;
+      transform: rotate(45deg);
+      box-shadow: 0 0 0 4px rgba(201,48,44,0.14);
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    #slider::-webkit-slider-thumb:hover { box-shadow: 0 0 0 6px rgba(201,48,44,0.22); }
+    #slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: var(--red);
+      border: 0;
+      transform: rotate(45deg);
+      box-shadow: 0 0 0 4px rgba(201,48,44,0.14);
+      cursor: pointer;
+    }
+    #slider::-moz-range-track {
+      height: 2px;
+      background: rgba(40,28,20,0.18);
     }
 
-    .stat { font-size: 13px; color: #ccc; margin: 3px 0; }
-    .stat span { color: #fff; font-weight: 600; }
-    #status { font-size: 11px; color: #666; margin-top: 10px; }
+    #search-control { margin-bottom: 12px; }
+
+    /* segmented toggles */
+    #mode-control,
+    #distance-source-control {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      border: 1px solid var(--hairline-strong);
+      border-radius: 2px;
+      background: rgba(40,28,20,0.04);
+      overflow: hidden;
+    }
+    #mode-control button,
+    #distance-source-control button {
+      border: 0;
+      border-radius: 0;
+      padding: 8px 6px;
+      color: var(--text-dim);
+      background: transparent;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    #mode-control button + button,
+    #distance-source-control button + button { border-left: 1px solid var(--hairline-strong); }
+    #mode-control button:hover,
+    #distance-source-control button:hover { color: var(--text); background: rgba(201,48,44,0.06); }
+    #mode-control button.active,
+    #distance-source-control button.active {
+      color: #fff;
+      background: var(--red);
+    }
+
+    .panel-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--hairline);
+    }
+    .section-title {
+      margin-bottom: 8px;
+      color: var(--text-faint);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .section-title::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--red);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+      margin: 5px 0;
+    }
+    .stat span {
+      color: var(--text);
+      font-weight: 600;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #country-control {
+      margin: 0 0 4px;
+      display: grid;
+      gap: 6px;
+    }
+    #country-control label {
+      font-size: 10px;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 600;
+    }
+    #country-select {
+      width: 100%;
+      min-height: 36px;
+      padding: 6px 32px 6px 12px;
+      border: 1px solid var(--hairline-strong);
+      border-radius: 2px;
+      background-color: var(--paper-strong);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='none' stroke='%234f4338' stroke-width='1.5' stroke-linecap='round' d='M3 4.5l3 3 3-3'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    #country-select:hover { border-color: var(--red); }
+    #country-select:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(201,48,44,0.15); }
+    #country-select option { background: #fbf8f1; color: var(--text); }
+
+    .result-line {
+      margin: 8px 0;
+      color: var(--text-dim);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .result-line strong { color: var(--text); font-weight: 600; }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .metric {
+      padding: 12px 14px;
+      border: 1px solid var(--hairline-strong);
+      border-radius: 2px;
+      background: var(--paper-strong);
+      background-image: var(--scanlines);
+      transition: background-color 0.18s ease, border-color 0.18s ease;
+      position: relative;
+    }
+    .metric:hover {
+      background-color: #fff;
+      border-color: var(--red-soft);
+    }
+    .metric.main {
+      grid-column: 1 / -1;
+      background-color: #fbf3ef;
+      border-color: var(--red);
+      border-left: 3px solid var(--red);
+      padding-left: 16px;
+    }
+    .metric.supercharger {
+      grid-column: 1 / -1;
+      background-color: #fbf5f0;
+      border-color: rgba(201,48,44,0.36);
+      border-left: 3px solid var(--red);
+      padding-left: 16px;
+    }
+    .metric-value {
+      display: block;
+      color: var(--text);
+      font-size: 19px;
+      font-weight: 600;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric.main .metric-value {
+      color: var(--red);
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+    }
+    .metric.supercharger .metric-value {
+      color: var(--red);
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+    }
+    .metric-label {
+      display: block;
+      margin-top: 6px;
+      color: var(--text-faint);
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    /* legend */
+    #legend { font-size: 11px; color: var(--text-dim); }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .sw {
+      width: 14px; height: 14px;
+      flex-shrink: 0;
+    }
+    .sw-ramp {
+      display: block;
+      width: 100%;
+      height: 10px;
+      flex-shrink: 0;
+      border: 1px solid var(--hairline-strong);
+      margin: 4px 0 4px;
+    }
+    .sw-green {
+      background: linear-gradient(
+        90deg,
+        #f5e6c8 0%, #f5e6c8 16.6%,
+        #e8c48c 16.6%, #e8c48c 33.3%,
+        #d98e49 33.3%, #d98e49 50%,
+        #cc552a 50%, #cc552a 66.6%,
+        #b42d28 66.6%, #b42d28 83.3%,
+        #7a1a1f 83.3%, #7a1a1f 100%
+      );
+    }
+    .ramp-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      margin-top: 2px;
+    }
+    .sw-marker {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      border: 1.5px solid #fff;
+      box-shadow: 0 0 0 1px var(--red);
+      margin: 2px;
+    }
+    .legend-hint {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--hairline);
+      font-size: 10px;
+      color: var(--text-faint);
+      line-height: 1.45;
+    }
+
+    .note {
+      margin-top: 4px;
+      color: var(--text-faint);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    .muted { color: var(--text-faint); }
+
+    #hover {
+      position: absolute;
+      pointer-events: none;
+      background: var(--paper-strong);
+      border: 1px solid var(--hairline-strong);
+      border-left: 2px solid var(--red);
+      border-radius: 2px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: var(--text);
+      z-index: 1001;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+
+    #status {
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    /* geocoder restyling — Animus light */
+    .maplibregl-ctrl-geocoder {
+      width: 100% !important;
+      max-width: none !important;
+      min-width: 0 !important;
+      border-radius: 2px;
+      box-shadow: none;
+      font-family: 'Inter', sans-serif !important;
+      background: var(--paper-strong) !important;
+      border: 1px solid var(--hairline-strong);
+    }
+    .maplibregl-ctrl-geocoder--input {
+      color: var(--text) !important;
+      height: 36px !important;
+      padding: 6px 36px !important;
+      font-size: 13px !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .maplibregl-ctrl-geocoder--input::placeholder { color: var(--text-faint) !important; }
+    .maplibregl-ctrl-geocoder--icon {
+      fill: var(--text-faint) !important;
+    }
+    .maplibregl-ctrl-geocoder--icon-search {
+      top: 9px !important;
+      left: 10px !important;
+      width: 18px !important;
+      height: 18px !important;
+    }
+    .maplibregl-ctrl-geocoder--button {
+      background: transparent !important;
+    }
+    .maplibregl-ctrl-geocoder .suggestions {
+      background: var(--paper-strong) !important;
+      border-radius: 2px !important;
+      border: 1px solid var(--hairline-strong) !important;
+      box-shadow: var(--shadow);
+      margin-top: 4px;
+    }
+    .maplibregl-ctrl-geocoder .suggestions > li > a {
+      color: var(--text-dim) !important;
+      padding: 8px 12px !important;
+    }
+    .maplibregl-ctrl-geocoder .suggestions > .active > a,
+    .maplibregl-ctrl-geocoder .suggestions > li > a:hover {
+      background: rgba(201,48,44,0.10) !important;
+      color: var(--text) !important;
+    }
+    .maplibregl-ctrl-geocoder--suggestion-title { color: var(--text) !important; font-weight: 600 !important; }
+
+    /* maplibre default controls — Animus light */
+    .maplibregl-ctrl-top-right { top: 70px !important; }
+    .maplibregl-ctrl-group {
+      background: var(--paper-strong) !important;
+      border: 1px solid var(--hairline-strong) !important;
+      border-radius: 2px !important;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .maplibregl-ctrl-group button { background: transparent !important; }
+    .maplibregl-ctrl-group button + button { border-top: 1px solid var(--hairline) !important; }
+    .maplibregl-ctrl-attrib {
+      background: rgba(251,248,241,0.85) !important;
+      color: var(--text-dim) !important;
+      border-radius: 2px !important;
+      font-size: 10px;
+    }
+    .maplibregl-ctrl-attrib a { color: var(--text-dim) !important; }
+
+    /* panel header with title + info */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: -2px 0 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      text-transform: uppercase;
+    }
+    .panel-title .accent { color: var(--red); }
+    .icon-btn {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 1px solid var(--hairline-strong);
+      background: var(--paper-strong);
+      color: var(--text-dim);
+      font-family: 'Times New Roman', Georgia, serif;
+      font-size: 14px;
+      font-style: italic;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .icon-btn:hover {
+      color: #fff;
+      border-color: var(--red);
+      background: var(--red);
+    }
+    .icon-btn.active { color: #fff; border-color: var(--red); background: var(--red); }
+
+    /* about / help panel (toggleable) */
+    #about-panel {
+      position: absolute;
+      z-index: 1001;
+      top: 86px; left: 400px;
+      width: 320px;
+      padding: 18px 20px;
+      display: none;
+      animation: fadeInUp 0.25s ease-out;
+    }
+    #about-panel.open { display: block; }
+    #about-panel h2 {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    #about-panel p {
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    #about-panel .kbd {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--hairline-strong);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text);
+    }
+    #about-panel a { color: var(--red-soft); text-decoration: none; }
+    #about-panel a:hover { color: var(--red); }
+    @media (max-width: 820px) {
+      #about-panel { top: 70px; left: 12px; right: 12px; width: auto; }
+    }
+
+    /* radius preset chips */
+    .preset-chips {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 5px 11px;
+      border-radius: 2px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--paper-strong);
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+    .chip:hover {
+      color: var(--red);
+      border-color: var(--red);
+    }
+    .chip.active {
+      color: #fff;
+      border-color: var(--red);
+      background: var(--red);
+    }
+
+    /* slider scale */
+    .slider-scale {
+      display: flex;
+      justify-content: space-between;
+      margin-top: -2px;
+      font-size: 9px;
+      color: var(--text-faint);
+      letter-spacing: 0.06em;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* country row with clear button */
+    .country-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: stretch;
+    }
+    #country-clear {
+      width: 36px;
+      border-radius: 2px;
+      border: 1px solid var(--hairline-strong);
+      background: var(--paper-strong);
+      color: var(--text-faint);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+      display: none;
+      transition: all 0.15s ease;
+    }
+    #country-clear:hover { color: #fff; border-color: var(--red); background: var(--red); }
+    #country-clear.visible { display: inline-flex; align-items: center; justify-content: center; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .map-panel { animation: fadeInUp 0.5s ease-out backwards; }
+    #panel { animation-delay: 0.05s; }
+    #info-panel { animation-delay: 0.15s; }
+    #legend-panel { animation-delay: 0.25s; }
+
+    @media (max-width: 820px) {
+      #info-panel { top: 360px; }
+      #legend-panel { display: none; }
+      .map-panel { padding: 14px 16px; width: calc(100vw - 24px); }
+      #panel, #info-panel { left: 12px; right: 12px; width: auto; }
+    }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<div id="panel">
-  <h1>TESLA SUPERCHARGER COVERAGE</h1>
-  <div id="radius-display">50 km</div>
-  <input id="slider" type="range" min="0" max="500" value="50" step="1">
-  <div class="stat">Global: <span id="global-stat">—</span></div>
-  <div class="stat">Viewport: <span id="viewport-stat">—</span></div>
-  <div id="status">Loading...</div>
+<div id="hero" title="Live global coverage at the selected radius">
+  <span id="hero-pct">—</span>
+  <span id="hero-text">of humanity within <span class="strong" id="hero-km">— km</span> of a Tesla Supercharger</span>
 </div>
 
-<script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
-<script src="https://unpkg.com/deck.gl@9/dist.min.js"></script>
-<script>
-  const API   = 'http://127.0.0.1:8000';
-  const LAT_M = 110540.0;
-  const LON_M = 111320.0;
+<div id="toolbar">
+  <button id="share-btn" class="toolbar-btn" type="button" title="Copy a link to this view">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <span id="share-label">Share</span>
+  </button>
+</div>
 
-  // ── Map ──────────────────────────────────────────────────────────────
+<div id="panel-stack">
+<div id="panel" class="map-panel">
+  <div class="panel-header">
+    <div class="panel-title">Supercharger <span class="accent">Access</span></div>
+    <button id="about-toggle" class="icon-btn" type="button" aria-label="About this map" title="About">i</button>
+  </div>
+
+  <div id="search-control"></div>
+
+  <div id="country-control">
+    <label for="country-select">Country</label>
+    <div class="country-row">
+      <select id="country-select">
+        <option value="">Select a country…</option>
+      </select>
+      <button id="country-clear" type="button" aria-label="Clear country" title="Clear country">×</button>
+    </div>
+    <div class="note">Or click a country on the map.</div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Distance to Tesla Supercharger</div>
+    <div class="distance-hero">
+      <input id="slider" type="range" min="0" max="1000" value="316" step="1" aria-label="Distance slider">
+      <div class="distance-input-wrap">
+        <input id="radius-display" type="number" min="0" max="500" step="1" value="50" aria-label="Distance in kilometers">
+        <span class="distance-unit">km</span>
+      </div>
+    </div>
+    <div class="slider-scale" aria-hidden="true">
+      <span>0</span><span>500 km</span>
+    </div>
+    <div class="preset-chips" id="preset-chips" role="group" aria-label="Distance presets">
+      <button class="chip" type="button" data-km="1">1</button>
+      <button class="chip" type="button" data-km="5">5</button>
+      <button class="chip" type="button" data-km="25">25</button>
+      <button class="chip" type="button" data-km="50">50</button>
+      <button class="chip" type="button" data-km="100">100</button>
+      <button class="chip" type="button" data-km="250">250</button>
+      <button class="chip" type="button" data-km="500">500</button>
+    </div>
+  </div>
+
+  <div class="panel-section">
+    <div class="section-title">Distance model</div>
+    <div id="distance-source-control" role="group" aria-label="Distance model">
+      <button type="button" data-source="great-circle" class="active" title="Straight-line distance from population cell to charger">Great-circle</button>
+      <button type="button" data-source="road" title="OSM driving-network distance where computed">Road (Germany only)</button>
+    </div>
+    <div class="note">Road cells outside computed regions fall back to great-circle.</div>
+  </div>
+
+  <div class="panel-section">
+    <div id="mode-control" role="group" aria-label="Display mode">
+      <button type="button" data-mode="auto" class="active" title="Smooth coverage at lower zooms">Smooth</button>
+      <button type="button" data-mode="exact" title="Show raw 100 m source cells">Exact</button>
+    </div>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div id="info-panel" class="map-panel">
+  <div class="section-title">Results</div>
+  <div id="country-result" class="result-line">Select a country to see country-level population and Supercharger counts.</div>
+  <div id="country-supercharger-result" class="result-line"></div>
+  <div id="global-result" class="result-line">—</div>
+</div>
+</div>
+
+<div id="about-panel" class="map-panel">
+  <h2>About this map</h2>
+  <p>Each cell on the map is a populated 100 m patch from the GHS-POP 2030 raster. Cells light up when their distance to the nearest open Tesla Supercharger is within the chosen radius.</p>
+  <h2>Controls</h2>
+  <p>
+    <span class="kbd">←</span> <span class="kbd">→</span> adjust the distance.<br>
+    Click a country on the map, or use the dropdown.<br>
+    <strong>Smooth</strong> blends coverage at low zoom; <strong>Exact</strong> shows raw cells.
+  </p>
+  <h2>Caveats</h2>
+  <p>Great-circle distance is from the cell center to a charger point. Road distance is computed on the OSM driving network; cells outside computed regions fall back to great-circle. Country borders use Natural Earth Admin 0; some include overseas territories. About 76 M people don't fall inside any country polygon.</p>
+</div>
+
+<div id="legend-panel" class="map-panel">
+  <div id="legend">
+    <div class="section-title">Legend</div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.10em;font-weight:600;">Population density (per cell)</div>
+      <span class="sw-ramp sw-green"></span>
+      <div class="ramp-scale"><span>Low</span><span>Med</span><span>High</span></div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:6px;">Cells within the chosen distance to a Supercharger.</div>
+    </div>
+    <div class="legend-row"><span class="sw sw-marker"></span><span>Open Tesla Supercharger</span></div>
+    <div class="legend-hint">Boundaries: Natural Earth Admin 0 (some include overseas territories). Click <strong>i</strong> top-left for data sources &amp; caveats.</div>
+  </div>
+</div>
+<div id="hover" style="display:none"></div>
+
+<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-geocoder@1.5.0/dist/maplibre-gl-geocoder.min.js"></script>
+<script>
+  const MAX_RADIUS_KM = 500;
+  const TILE_SIZE = 256;
+  const MAX_NATIVE_ZOOM = 11;
+  const TILE_OVERSAMPLE = 2;
+  const MAX_TILE_CACHE_SIZE = 400;
+  const DIST_CODE_MAX = 65535;
+  const TILE_VERSION = 'z11-footprint-rg16-v1';
+  const DISTANCE_SOURCES = {
+    'great-circle': { suffix: '', tileDir: 'tiles' },
+    road: { suffix: '_road', tileDir: 'tiles_road' },
+  };
+
+  const DEFAULT_CENTER = [13.405, 52.52];
+  const DEFAULT_ZOOM = 5;
+  const initialHashState = parseHashState();
+
+  let currentRadius = initialHashState.radius ?? 50;
+  let displayMode = initialHashState.mode ?? 'auto';
+  let distanceSource = initialHashState.source ?? 'great-circle';
+  let popMaxLog1p = 0;
+  let isApplyingHash = false;
+  let hashUpdateTimer = null;
+
+  const hoverCanvas = document.createElement('canvas');
+  hoverCanvas.width = 1;
+  hoverCanvas.height = 1;
+  const hoverCtx = hoverCanvas.getContext('2d', { willReadFrequently: true });
+
+  function sliderToKm(v) {
+    return Math.round(Math.pow(v / 1000, 2) * 500);
+  }
+
+  function kmToSlider(km) {
+    return Math.round(1000 * Math.sqrt(Math.max(0, Math.min(MAX_RADIUS_KM, km)) / MAX_RADIUS_KM));
+  }
+
+  function parseHashState() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const state = {};
+
+    const radius = Number(params.get('radius'));
+    if (Number.isFinite(radius)) {
+      state.radius = Math.max(0, Math.min(MAX_RADIUS_KM, Math.round(radius)));
+    }
+
+    const lat = Number(params.get('lat'));
+    const lng = Number(params.get('lng'));
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      state.lat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+      state.lng = ((((lng + 180) % 360) + 360) % 360) - 180;
+    }
+
+    const zoom = Number(params.get('zoom'));
+    if (Number.isFinite(zoom)) {
+      state.zoom = Math.max(0, Math.min(16, zoom));
+    }
+
+    const mode = params.get('mode');
+    if (mode === 'auto' || mode === 'exact') {
+      state.mode = mode;
+    }
+
+    const source = params.get('source') || params.get('distance');
+    if (source === 'road') {
+      state.source = 'road';
+    } else if (source === 'great-circle' || source === 'great_circle' || source === 'gc') {
+      state.source = 'great-circle';
+    }
+
+    const country = Number(params.get('country'));
+    if (Number.isInteger(country) && country > 0) {
+      state.country = country;
+    }
+
+    return state;
+  }
+
+  function readTilePixel(img, px, py) {
+    hoverCtx.clearRect(0, 0, 1, 1);
+    hoverCtx.drawImage(img, -px, -py);
+    return hoverCtx.getImageData(0, 0, 1, 1).data;
+  }
+
+  function readCoveragePixel(entry, px, py) {
+    if (distanceSource === 'road' && entry.overrideImage) {
+      const overridePixel = readTilePixel(entry.overrideImage, px, py);
+      if (overridePixel[3] > 0) {
+        return overridePixel;
+      }
+    }
+    return readTilePixel(entry.image, px, py);
+  }
+
+  function lngLatToTilePixel(lng, lat, z) {
+    const n = 2 ** z;
+    const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+    const x = (lng + 180) / 360 * n;
+    const sinLat = Math.sin(clampedLat * Math.PI / 180);
+    const y = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * n;
+    const rawTx = Math.floor(x);
+    const tx = ((rawTx % n) + n) % n;
+    const ty = Math.max(0, Math.min(n - 1, Math.floor(y)));
+    return {
+      tx,
+      ty,
+      px: Math.max(0, Math.min(255, Math.floor((x - rawTx) * TILE_SIZE))),
+      py: Math.max(0, Math.min(255, Math.floor((y - Math.floor(y)) * TILE_SIZE))),
+    };
+  }
+
+  function decodeDistKm(r, g, a) {
+    if (a <= 0) return null;
+    const code = r * 256 + g;
+    return code / DIST_CODE_MAX * MAX_RADIUS_KM;
+  }
+
+  function decodePop(a) {
+    if (!popMaxLog1p || a <= 0) return null;
+    return Math.expm1(a / 255 * popMaxLog1p);
+  }
+
   const map = new maplibregl.Map({
     container: 'map',
     style: {
       version: 8,
       sources: {
-        carto: {
+        carto_base: {
           type: 'raster',
-          tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+          tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}@2x.png'],
           tileSize: 512,
           attribution: '© OpenStreetMap © CARTO',
-        }
+        },
+        carto_labels: {
+          type: 'raster',
+          tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png'],
+          tileSize: 512,
+        },
       },
-      layers: [{ id: 'carto', type: 'raster', source: 'carto' }]
+      layers: [
+        { id: 'carto_base', type: 'raster', source: 'carto_base' },
+      ],
     },
-    center: [13.405, 52.52],
-    zoom: 12,
+    center: [
+      initialHashState.lng ?? DEFAULT_CENTER[0],
+      initialHashState.lat ?? DEFAULT_CENTER[1],
+    ],
+    zoom: initialHashState.zoom ?? DEFAULT_ZOOM,
+    maxZoom: 16,
   });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-  // ── deck.gl overlay ──────────────────────────────────────────────────
-  const deckCanvas = document.createElement('canvas');
-  deckCanvas.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
-  document.getElementById('map').appendChild(deckCanvas);
+  class CoverageTileLayer {
+    constructor() {
+      this.id = 'coverage';
+      this.type = 'custom';
+      this.renderingMode = '2d';
+      this.radiusCode = this.radiusToCode(currentRadius);
+      this.displayMode = displayMode;
+      this.tileDir = DISTANCE_SOURCES[distanceSource].tileDir;
+      this.tiles = new Map();
+      this.frameId = 0;
+    }
 
-  const deckgl = new deck.Deck({
-    canvas: deckCanvas,
-    controller: false,
-    layers: [],
-  });
+    onAdd(map, gl) {
+      this.map = map;
+      this.gl = gl;
+      this.program = this.createProgram(gl);
+      this.aPos = gl.getAttribLocation(this.program, 'a_pos');
+      this.aUv = gl.getAttribLocation(this.program, 'a_uv');
+      this.uMatrix = gl.getUniformLocation(this.program, 'u_matrix');
+      this.uImage = gl.getUniformLocation(this.program, 'u_image');
+      this.uOverrideImage = gl.getUniformLocation(this.program, 'u_override_image');
+      this.uHasOverride = gl.getUniformLocation(this.program, 'u_has_override');
+      this.uRadiusCode = gl.getUniformLocation(this.program, 'u_radius_code');
+      this.uTexelSize = gl.getUniformLocation(this.program, 'u_texel_size');
+      this.uSmoothMix = gl.getUniformLocation(this.program, 'u_smooth_mix');
+      this.uAlphaCap = gl.getUniformLocation(this.program, 'u_alpha_cap');
+      this.buffer = gl.createBuffer();
+    }
 
-  function syncSize() {
-    const container = map.getContainer();
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    deckCanvas.style.width  = w + 'px';
-    deckCanvas.style.height = h + 'px';
-    deckgl.setProps({ width: w, height: h });
+    radiusToCode(radiusKm) {
+      const norm = Math.max(0, Math.min(1, radiusKm / MAX_RADIUS_KM));
+      return Math.ceil(norm * DIST_CODE_MAX);
+    }
+
+    setRadius(radiusKm) {
+      this.radiusCode = this.radiusToCode(radiusKm);
+      if (this.map) this.map.triggerRepaint();
+    }
+
+    setDisplayMode(mode) {
+      this.displayMode = mode;
+      if (this.map) this.map.triggerRepaint();
+    }
+
+    setDistanceSource(source) {
+      this.tileDir = DISTANCE_SOURCES[source].tileDir;
+      this.clearTiles();
+      if (this.map) this.map.triggerRepaint();
+    }
+
+    clearTiles() {
+      if (this.gl) {
+        for (const entry of this.tiles.values()) {
+          if (entry.texture) this.gl.deleteTexture(entry.texture);
+          if (entry.overrideTexture) this.gl.deleteTexture(entry.overrideTexture);
+          entry.evicted = true;
+        }
+      }
+      this.tiles.clear();
+    }
+
+    createProgram(gl) {
+      const vertexSource = `
+        precision highp float;
+        uniform mat4 u_matrix;
+        attribute vec2 a_pos;
+        attribute vec2 a_uv;
+        varying vec2 v_uv;
+        void main() {
+          gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+          v_uv = a_uv;
+        }
+      `;
+      const fragmentSource = `
+        precision highp float;
+        uniform sampler2D u_image;
+        uniform sampler2D u_override_image;
+        uniform float u_has_override;
+        uniform float u_radius_code;
+        uniform vec2 u_texel_size;
+        uniform float u_smooth_mix;
+        uniform float u_alpha_cap;
+        varying vec2 v_uv;
+
+        float byteValue(float v) {
+          return floor(v * 255.0 + 0.5);
+        }
+
+        float distanceCode(vec4 tex) {
+          return byteValue(tex.r) * 256.0 + byteValue(tex.g);
+        }
+
+        float densityValue(vec4 tex) {
+          return tex.a;
+        }
+
+        vec4 sourceTexel(vec2 uv) {
+          vec4 base = texture2D(u_image, uv);
+          if (u_has_override > 0.5) {
+            vec4 overrideTex = texture2D(u_override_image, uv);
+            if (overrideTex.a > 0.0) {
+              return overrideTex;
+            }
+          }
+          return base;
+        }
+
+        float opacityDensity(float d) {
+          return max(0.22, smoothstep(0.0, 1.0, pow(d, 0.5)));
+        }
+
+        vec3 coveredColor(float d) {
+          // Animus warm ramp: cream -> tan -> amber -> orange -> red -> crimson
+          // Thresholds approximate 10, 100, 300, 1k, 3k people per 100m cell.
+          if (d < 0.206) {
+            return vec3(245.0 / 255.0, 230.0 / 255.0, 200.0 / 255.0);
+          }
+          if (d < 0.397) {
+            return vec3(232.0 / 255.0, 196.0 / 255.0, 140.0 / 255.0);
+          }
+          if (d < 0.491) {
+            return vec3(217.0 / 255.0, 142.0 / 255.0,  73.0 / 255.0);
+          }
+          if (d < 0.594) {
+            return vec3(204.0 / 255.0,  85.0 / 255.0,  42.0 / 255.0);
+          }
+          if (d < 0.689) {
+            return vec3(180.0 / 255.0,  45.0 / 255.0,  40.0 / 255.0);
+          }
+          return vec3(122.0 / 255.0, 26.0 / 255.0, 31.0 / 255.0);
+        }
+
+        vec4 sampleCell(vec2 uv) {
+          vec4 tex = sourceTexel(uv);
+          if (tex.a <= 0.0) {
+            return vec4(0.0);
+          }
+
+          float density = densityValue(tex);
+          float alpha = opacityDensity(density);
+          vec3 rgb;
+          if (distanceCode(tex) <= u_radius_code) {
+            alpha = min(alpha, u_alpha_cap);
+            rgb = coveredColor(density);
+          } else {
+            return vec4(0.0);
+          }
+
+          if (alpha <= 0.0) {
+            return vec4(0.0);
+          }
+          return vec4(rgb * alpha, alpha);
+        }
+
+        void main() {
+          vec4 exact = sampleCell(v_uv);
+          vec4 smooth =
+            sampleCell(v_uv + u_texel_size * vec2(-1.0, -1.0)) +
+            sampleCell(v_uv + u_texel_size * vec2( 1.0, -1.0)) +
+            sampleCell(v_uv + u_texel_size * vec2(-1.0,  1.0)) +
+            sampleCell(v_uv + u_texel_size * vec2( 1.0,  1.0)) +
+            2.0 * sampleCell(v_uv + u_texel_size * vec2( 0.0, -1.0)) +
+            2.0 * sampleCell(v_uv + u_texel_size * vec2(-1.0,  0.0)) +
+            2.0 * sampleCell(v_uv + u_texel_size * vec2( 1.0,  0.0)) +
+            2.0 * sampleCell(v_uv + u_texel_size * vec2( 0.0,  1.0)) +
+            4.0 * exact;
+          smooth /= 16.0;
+
+          vec4 color = mix(exact, smooth, u_smooth_mix);
+          if (color.a <= 0.0) {
+            discard;
+          }
+          gl_FragColor = vec4(color.rgb / color.a, color.a);
+        }
+      `;
+      const vertexShader = this.compileShader(gl, gl.VERTEX_SHADER, vertexSource);
+      const fragmentShader = this.compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw new Error(gl.getProgramInfoLog(program));
+      }
+      return program;
+    }
+
+    compileShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(shader));
+      }
+      return shader;
+    }
+
+    render(gl, args) {
+      this.frameId += 1;
+      const matrix = args && args.defaultProjectionData
+        ? args.defaultProjectionData.mainMatrix
+        : (args && args.modelViewProjectionMatrix) || args;
+      const z = Math.max(0, Math.min(
+        MAX_NATIVE_ZOOM,
+        Math.floor(this.map.getZoom()) + TILE_OVERSAMPLE,
+      ));
+      const tiles = this.visibleTiles(z);
+      gl.useProgram(this.program);
+      gl.uniformMatrix4fv(this.uMatrix, false, matrix);
+      gl.uniform1f(this.uRadiusCode, this.radiusCode);
+      gl.uniform2f(this.uTexelSize, 1 / TILE_SIZE, 1 / TILE_SIZE);
+      const zoom = this.map.getZoom();
+      const baseSmoothMix = this.displayMode === 'auto'
+        ? Math.max(0, Math.min(1, (10.5 - zoom) / 3.0))
+        : 0;
+      const radiusSmoothMix = Math.max(0, Math.min(1, (currentRadius - 5) / 20));
+      const smoothMix = baseSmoothMix * radiusSmoothMix;
+      gl.uniform1f(this.uSmoothMix, smoothMix);
+      // alpha cap: 0.78 at z<=5, fades to 0.48 at z>=13
+      const alphaCap = Math.max(0.48, Math.min(0.78, 0.78 - (zoom - 5) * (0.30 / 8)));
+      gl.uniform1f(this.uAlphaCap, alphaCap);
+      gl.uniform1i(this.uImage, 0);
+      gl.uniform1i(this.uOverrideImage, 1);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+      gl.enableVertexAttribArray(this.aPos);
+      gl.enableVertexAttribArray(this.aUv);
+      gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 16, 0);
+      gl.vertexAttribPointer(this.aUv, 2, gl.FLOAT, false, 16, 8);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.DEPTH_TEST);
+      gl.depthMask(false);
+
+      for (const tile of tiles) {
+        const entry = this.getTile(tile.z, tile.urlX, tile.y);
+        if (!entry || entry.status !== 'loaded') continue;
+        entry.lastUsed = this.frameId;
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, entry.texture);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, entry.overrideTexture || entry.texture);
+        gl.uniform1f(this.uHasOverride, entry.overrideTexture ? 1 : 0);
+        gl.bufferData(gl.ARRAY_BUFFER, this.tileVertices(tile.z, tile.renderX, tile.y), gl.STREAM_DRAW);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+      this.evictTiles();
+    }
+
+    visibleTiles(z) {
+      const n = 1 << z;
+      const bounds = this.map.getBounds();
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      const north = Math.min(85.05112878, bounds.getNorth());
+      const south = Math.max(-85.05112878, bounds.getSouth());
+      const xMin = Math.floor((west + 180) / 360 * n) - 1;
+      const xMax = Math.floor((east + 180) / 360 * n) + 1;
+      const yMin = Math.max(0, Math.floor(this.latToTileY(north, z)) - 1);
+      const yMax = Math.min(n - 1, Math.floor(this.latToTileY(south, z)) + 1);
+      const tiles = [];
+      for (let y = yMin; y <= yMax; y++) {
+        for (let renderX = xMin; renderX <= xMax; renderX++) {
+          const urlX = ((renderX % n) + n) % n;
+          tiles.push({ z, renderX, urlX, y });
+        }
+      }
+      return tiles;
+    }
+
+    latToTileY(lat, z) {
+      const n = 1 << z;
+      const rad = lat * Math.PI / 180;
+      return (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * n;
+    }
+
+    tileVertices(z, x, y) {
+      const n = 1 << z;
+      const x0 = x / n;
+      const x1 = (x + 1) / n;
+      const y0 = y / n;
+      const y1 = (y + 1) / n;
+      return new Float32Array([
+        x0, y0, 0, 0,
+        x1, y0, 1, 0,
+        x1, y1, 1, 1,
+        x0, y0, 0, 0,
+        x1, y1, 1, 1,
+        x0, y1, 0, 1,
+      ]);
+    }
+
+    getTile(z, x, y) {
+      const key = `${z}/${x}/${y}`;
+      const existing = this.tiles.get(key);
+      if (existing) {
+        existing.lastUsed = this.frameId;
+        return existing;
+      }
+      const entry = {
+        status: 'loading',
+        texture: null,
+        overrideTexture: null,
+        image: null,
+        overrideImage: null,
+        lastUsed: this.frameId,
+        evicted: false,
+      };
+      this.tiles.set(key, entry);
+
+      const makeTexture = (img) => {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        return texture;
+      };
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        if (entry.evicted) return;
+        entry.status = 'loaded';
+        entry.texture = makeTexture(img);
+        entry.image = img;
+        this.map.triggerRepaint();
+      };
+      img.onerror = () => {
+        if (entry.evicted) return;
+        entry.status = 'empty';
+      };
+      if (distanceSource === 'road') {
+        const overrideImg = new Image();
+        overrideImg.crossOrigin = 'anonymous';
+        overrideImg.onload = () => {
+          if (entry.evicted) return;
+          entry.overrideTexture = makeTexture(overrideImg);
+          entry.overrideImage = overrideImg;
+          this.map.triggerRepaint();
+        };
+        overrideImg.onerror = () => {
+          if (entry.evicted) return;
+          entry.overrideTexture = null;
+          entry.overrideImage = null;
+        };
+        overrideImg.src = `./${DISTANCE_SOURCES.road.tileDir}/${z}/${x}/${y}.png?v=${TILE_VERSION}-road-override`;
+      }
+
+      img.src = `./${DISTANCE_SOURCES['great-circle'].tileDir}/${z}/${x}/${y}.png?v=${TILE_VERSION}`;
+      return entry;
+    }
+
+    evictTiles() {
+      if (this.tiles.size <= MAX_TILE_CACHE_SIZE) return;
+      const candidates = Array.from(this.tiles.entries())
+        .filter(([, entry]) => entry.status !== 'loading')
+        .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+
+      for (const [key, entry] of candidates) {
+        if (this.tiles.size <= MAX_TILE_CACHE_SIZE) break;
+        entry.evicted = true;
+        if (entry.texture) {
+          this.gl.deleteTexture(entry.texture);
+        }
+        if (entry.overrideTexture) {
+          this.gl.deleteTexture(entry.overrideTexture);
+        }
+        entry.texture = null;
+        entry.overrideTexture = null;
+        entry.image = null;
+        entry.overrideImage = null;
+        this.tiles.delete(key);
+      }
+    }
   }
 
-  function syncViewState() {
-    const c = map.getCenter();
-    deckgl.setProps({
-      viewState: {
-        longitude: c.lng,
-        latitude:  c.lat,
-        zoom:      map.getZoom(),
-        bearing:   map.getBearing(),
-        pitch:     map.getPitch(),
-      },
-    });
-  }
+  const coverageLayer = new CoverageTileLayer();
 
-  map.on('move',   syncViewState);
-  map.on('resize', () => { syncSize(); syncViewState(); });
+  map.on('error', (e) => {
+    const msg = (e && e.error && e.error.message) || String(e);
+    console.error('MapLibre error:', e);
+    document.getElementById('status').textContent = 'Map error: ' + msg;
+  });
 
-  // ── UI ───────────────────────────────────────────────────────────────
   const slider       = document.getElementById('slider');
-  const radiusLabel  = document.getElementById('radius-display');
-  const globalStat   = document.getElementById('global-stat');
-  const viewportStat = document.getElementById('viewport-stat');
+  const radiusInput  = document.getElementById('radius-display');
+  const globalResult = document.getElementById('global-result');
+  const countryResult = document.getElementById('country-result');
+  const countrySuperchargerResult = document.getElementById('country-supercharger-result');
+  const viewportStat = null;
+  const countrySelect = document.getElementById('country-select');
   const status       = document.getElementById('status');
+  const hoverEl      = document.getElementById('hover');
+  const modeButtons  = Array.from(document.querySelectorAll('#mode-control button'));
+  const sourceButtons = Array.from(document.querySelectorAll('#distance-source-control button'));
 
-  let fetchTimer    = null;
-  let currentRadius = 50;
+  function sourceAssetPath(stem, ext) {
+    return `./${stem}${DISTANCE_SOURCES[distanceSource].suffix}.${ext}`;
+  }
 
   function fmt(n) {
+    if (!isFinite(n)) return '—';
     if (n >= 1e9) return (n/1e9).toFixed(2) + 'B';
     if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
     return Math.round(n).toLocaleString();
   }
 
-  // ── Data layer ───────────────────────────────────────────────────────
-  function makeCorners(cell_m) {
-    const dlat = (cell_m / 2) / LAT_M;
-    return px => {
-      const dlon = (cell_m / 2) / (LON_M * Math.cos(px.lat * Math.PI / 180));
-      return [
-        [px.lon - dlon, px.lat - dlat],
-        [px.lon + dlon, px.lat - dlat],
-        [px.lon + dlon, px.lat + dlat],
-        [px.lon - dlon, px.lat + dlat],
-      ];
-    };
+  function fmtPerCharger(n) {
+    if (!isFinite(n)) return '—';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return Math.round(n / 1e3).toLocaleString() + 'k';
+    return Math.round(n).toLocaleString();
   }
 
-  function buildLayer(pixels, mode, cell_m) {
-    if (!pixels || pixels.length === 0) return null;
-    const getPolygon = makeCorners(cell_m);
-
-    if (mode === 'native') {
-      const maxPop = pixels.reduce((m, p) => Math.max(m, p.pop), 1);
-      return new deck.SolidPolygonLayer({
-        id: 'cells', data: pixels, getPolygon,
-        getFillColor: px => {
-          const t = Math.sqrt(px.pop / maxPop);
-          return [Math.round(t*80), Math.round(100+t*155), Math.round(t*40), Math.round((0.3+t*0.6)*255)];
-        },
-        stroked: false, pickable: false,
-      });
-    } else {
-      return new deck.SolidPolygonLayer({
-        id: 'cells', data: pixels, getPolygon,
-        getFillColor: px => {
-          const f = px.fraction;
-          const r = f < 0.5 ? 255 : Math.round(255 * (1 - (f - 0.5) * 2));
-          const g = f < 0.5 ? Math.round(255 * f * 2) : 255;
-          return [r, g, 0, Math.round(180 + f * 60)];
-        },
-        stroked: false, pickable: false,
-      });
+  function syncModeButtons() {
+    for (const button of modeButtons) {
+      button.classList.toggle('active', button.dataset.mode === displayMode);
     }
   }
 
-  async function fetchCoverage(radius) {
-    const r = await fetch(`${API}/coverage?radius=${radius}`);
-    const d = await r.json();
-    globalStat.textContent = `${fmt(d.covered)} (${(d.fraction*100).toFixed(1)}%)`;
+  function syncSourceButtons() {
+    for (const button of sourceButtons) {
+      button.classList.toggle('active', button.dataset.source === distanceSource);
+    }
   }
 
-  async function fetchPixels() {
-    const b    = map.getBounds();
-    const zoom = map.getZoom();
+  function updateHashNow() {
+    if (isApplyingHash) return;
+    const center = map.getCenter();
+    const params = new URLSearchParams();
+    params.set('radius', String(currentRadius));
+    params.set('lat', center.lat.toFixed(5));
+    params.set('lng', center.lng.toFixed(5));
+    params.set('zoom', map.getZoom().toFixed(2));
+    params.set('mode', displayMode);
+    params.set('source', distanceSource);
+    if (selectedCountryId) params.set('country', String(selectedCountryId));
+    const hash = params.toString();
+    if (location.hash.replace(/^#/, '') !== hash) {
+      history.replaceState(null, '', `#${hash}`);
+    }
+  }
 
-    status.textContent = 'Loading...';
-    const lonMin = Math.max(b.getWest(),  -180);
-    const lonMax = Math.min(b.getEast(),   180);
-    const url = `${API}/pixels?lat_min=${b.getSouth()}&lat_max=${b.getNorth()}&lon_min=${lonMin}&lon_max=${lonMax}&radius=${currentRadius}&zoom=${zoom.toFixed(2)}&max_px=1000000`;
+  function scheduleHashUpdate() {
+    if (isApplyingHash) return;
+    clearTimeout(hashUpdateTimer);
+    hashUpdateTimer = setTimeout(updateHashNow, 100);
+  }
+
+  function applyHashState(state) {
+    isApplyingHash = true;
+
+    if (state.radius !== undefined) {
+      currentRadius = state.radius;
+      slider.value = kmToSlider(currentRadius);
+      applyRadius();
+    }
+
+    if (state.mode !== undefined) {
+      displayMode = state.mode;
+      syncModeButtons();
+      coverageLayer.setDisplayMode(displayMode);
+    }
+
+    if (state.source !== undefined && state.source !== distanceSource) {
+      setDistanceSource(state.source, false);
+    }
+
+    if (state.lat !== undefined && state.lng !== undefined) {
+      map.jumpTo({
+        center: [state.lng, state.lat],
+        zoom: state.zoom ?? map.getZoom(),
+      });
+      updateViewportStat();
+    } else if (state.zoom !== undefined) {
+      map.jumpTo({ zoom: state.zoom });
+      updateViewportStat();
+    }
+
+    if (state.country !== undefined && countryById.has(state.country)) {
+      selectCountry(state.country, false);
+    }
+
+    setTimeout(() => {
+      isApplyingHash = false;
+    }, 0);
+  }
+
+  // ───────────────────── global stat (pop_cumulative.json) ─────────────────────
+  let popCumulative = null, totalPop = 0;
+  async function loadGlobal() {
+    const r = await fetch(sourceAssetPath('pop_cumulative', 'json'));
+    if (!r.ok) throw new Error(`Missing global stats for ${distanceSource}`);
+    const payload = await r.json();
+    if (Array.isArray(payload)) {
+      popCumulative = payload;
+      totalPop = popCumulative[popCumulative.length - 1];
+    } else {
+      popCumulative = payload.cumulative;
+      totalPop = payload.total_pop;
+      popMaxLog1p = payload.pop_max_log1p || 0;
+    }
+  }
+  function updateGlobalStat() {
+    if (!popCumulative) {
+      const heroPctEl = document.getElementById('hero-pct');
+      const heroKmEl = document.getElementById('hero-km');
+      if (heroPctEl) heroPctEl.textContent = '—';
+      if (heroKmEl) heroKmEl.textContent = `${currentRadius} km`;
+      return;
+    }
+    const r = Math.max(0, Math.min(popCumulative.length - 1, Math.ceil(currentRadius)));
+    const covered = popCumulative[r];
+    const pct = totalPop > 0 ? (covered / totalPop * 100).toFixed(1) : '0.0';
+    const uncovered = Math.max(0, totalPop - covered);
+
+    const heroPctEl = document.getElementById('hero-pct');
+    const heroKmEl = document.getElementById('hero-km');
+    if (heroPctEl) heroPctEl.textContent = `${pct}%`;
+    if (heroKmEl) heroKmEl.textContent = `${currentRadius} km`;
+    globalResult.innerHTML = `
+      <div class="metric-grid">
+        <div class="metric main">
+          <span class="metric-value">${pct}%</span>
+          <span class="metric-label">of the world’s population lives within ${currentRadius} km of Tesla’s Supercharger network</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${fmt(covered)}</span>
+          <span class="metric-label">people within ${currentRadius} km</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${fmt(uncovered)}</span>
+          <span class="metric-label">people farther than ${currentRadius} km from the network</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // ───────────────────── viewport stats (precomputed bins) ─────────────────────
+  let manifest = null;
+  let popTotal = null;     // Float32Array (LAT_BINS * LON_BINS)
+  let popCovered = null;   // Float32Array (LAT_BINS * LON_BINS * N_RADII)
+
+  async function loadViewport() {
+    const manifestResponse = await fetch(sourceAssetPath('viewport_manifest', 'json'));
+    if (!manifestResponse.ok) throw new Error(`Missing viewport stats for ${distanceSource}`);
+    manifest = await manifestResponse.json();
+    const [ptBuf, pcBuf] = await Promise.all([
+      fetch('./' + manifest.pop_total_path).then(r => r.arrayBuffer()),
+      fetch('./' + manifest.pop_covered_path).then(r => r.arrayBuffer()),
+    ]);
+    popTotal   = new Float32Array(ptBuf);
+    popCovered = new Float32Array(pcBuf);
+  }
+
+  function updateViewportStat() {
+    if (!viewportStat) return;
+    if (!popTotal || !popCovered || !manifest) return;
+    const { lat_bins, lon_bins, radius_step_km, n_radii } = manifest;
+
+    const b = map.getBounds();
+    const south = Math.max(-90, b.getSouth());
+    const north = Math.min( 90, b.getNorth());
+    const west  = Math.max(-180, b.getWest());
+    const east  = Math.min( 180, b.getEast());
+    if (north <= south || east <= west) return;
+
+    const latLo = Math.max(0, Math.min(lat_bins, Math.floor(south + 90)));
+    const latHi = Math.max(0, Math.min(lat_bins, Math.ceil (north + 90)));
+    const lonLo = Math.max(0, Math.min(lon_bins, Math.floor(west + 180)));
+    const lonHi = Math.max(0, Math.min(lon_bins, Math.ceil (east + 180)));
+
+    const rBucket = Math.max(0, Math.min(n_radii - 1,
+                       Math.ceil(currentRadius / radius_step_km)));
+
+    let total = 0, cov = 0;
+    for (let lat = latLo; lat < latHi; lat++) {
+      const rowBase  = lat * lon_bins;
+      const covBase  = rowBase * n_radii;
+      for (let lon = lonLo; lon < lonHi; lon++) {
+        total += popTotal[rowBase + lon];
+        cov   += popCovered[covBase + lon * n_radii + rBucket];
+      }
+    }
+    const frac = total > 0 ? cov / total : 0;
+    viewportStat.textContent = `${fmt(cov)} / ${fmt(total)} (${(frac*100).toFixed(1)}%)`;
+  }
+
+  // ───────────────────── country stats ───────────────────────────────────────
+  let countryStatsPayload = null;
+  let countryById = new Map();
+  let selectedCountryId = null;
+
+  function countryRadiusBucket() {
+    if (!countryStatsPayload) return 0;
+    const step = countryStatsPayload.radius_step_km || 1;
+    const n = countryStatsPayload.n_radii || 1;
+    return Math.max(0, Math.min(n - 1, Math.ceil(currentRadius / step)));
+  }
+
+  function updateCountryStat() {
+    if (!countryStatsPayload || !selectedCountryId) {
+      countryResult.innerHTML = '<span class="muted">Select a country or click one on the map to see country-level access, population, and Supercharger density.</span>';
+      countrySuperchargerResult.innerHTML = '';
+      return;
+    }
+    const country = countryById.get(selectedCountryId);
+    if (!country) {
+      countryResult.innerHTML = '<span class="muted">Select a country or click one on the map to see country-level access, population, and Supercharger density.</span>';
+      countrySuperchargerResult.innerHTML = '';
+      return;
+    }
+    const total = country.total_pop || 0;
+    const covered = country.covered[countryRadiusBucket()] || 0;
+    const pctValue = total > 0 ? covered / total * 100 : 0;
+    const pct = pctValue.toFixed(1);
+    const uncovered = Math.max(0, total - covered);
+    const perCharger = country.charger_count > 0 ? total / country.charger_count : Infinity;
+    countryResult.innerHTML = `
+      <div class="metric-grid">
+        <div class="metric main">
+          <span class="metric-value">${pct}%</span>
+          <span class="metric-label">of ${country.name}’s population lives within ${currentRadius} km of Tesla’s Supercharger network</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${fmt(covered)}</span>
+          <span class="metric-label">people within ${currentRadius} km</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${fmt(uncovered)}</span>
+          <span class="metric-label">people farther than ${currentRadius} km from the network</span>
+        </div>
+      </div>
+    `;
+    countrySuperchargerResult.innerHTML = `
+      <div class="metric-grid">
+        <div class="metric supercharger">
+          <span class="metric-value">${country.charger_count.toLocaleString()}</span>
+          <span class="metric-label">Tesla Superchargers in ${country.name}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${fmtPerCharger(perCharger)}</span>
+          <span class="metric-label">people per Supercharger in ${country.name}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-value">${country.charger_count > 0 ? fmtPerCharger(covered / country.charger_count) : '—'}</span>
+          <span class="metric-label">people within ${currentRadius} km per Supercharger</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function setSelectedCountryFeatureState(id) {
+    if (!map.getSource('countries')) return;
+    for (const country of countryById.values()) {
+      map.setFeatureState({ source: 'countries', id: country.id }, { selected: country.id === id });
+    }
+  }
+
+  function selectCountry(id, fit = true) {
+    selectedCountryId = id || null;
+    countrySelect.value = selectedCountryId ? String(selectedCountryId) : '';
+    setSelectedCountryFeatureState(selectedCountryId);
+    updateCountryStat();
+    if (fit && selectedCountryId) {
+      const country = countryById.get(selectedCountryId);
+      if (country?.bbox) {
+        map.fitBounds(
+          [[country.bbox[0], country.bbox[1]], [country.bbox[2], country.bbox[3]]],
+          { padding: 72, maxZoom: 7 }
+        );
+      }
+    }
+    syncCountryClear();
+    scheduleHashUpdate();
+  }
+
+  async function loadCountryStats() {
+    const response = await fetch(sourceAssetPath('country_stats', 'json'));
+    if (!response.ok) throw new Error(`Missing country stats for ${distanceSource}`);
+    const stats = await response.json();
+    countryStatsPayload = stats;
+    countryById = new Map(stats.countries.map(country => [country.id, country]));
+    return stats;
+  }
+
+  async function loadCountries() {
+    const [countryGeojson, stats] = await Promise.all([
+      fetch('./countries.geojson').then(r => r.json()),
+      loadCountryStats(),
+    ]);
+
+    countrySelect.innerHTML = '<option value="">Select a country</option>';
+    for (const country of [...stats.countries].sort((a, b) => a.name.localeCompare(b.name))) {
+      const option = document.createElement('option');
+      option.value = String(country.id);
+      option.textContent = `${country.name} (${country.iso_a3})`;
+      countrySelect.appendChild(option);
+    }
+
+    map.addSource('countries', { type: 'geojson', data: countryGeojson });
+    map.addLayer({
+      id: 'country-fill',
+      type: 'fill',
+      source: 'countries',
+      paint: {
+        'fill-color': '#e82127',
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'selected'], false], 0.11,
+          0.001,
+        ],
+      },
+    });
+    map.addLayer({
+      id: 'country-line',
+      type: 'line',
+      source: 'countries',
+      paint: {
+        'line-color': [
+          'case',
+          ['boolean', ['feature-state', 'selected'], false], '#e82127',
+          'rgba(0,0,0,0)',
+        ],
+        'line-width': [
+          'case',
+          ['boolean', ['feature-state', 'selected'], false], 2,
+          0,
+        ],
+      },
+    });
+
+    map.on('click', 'country-fill', (event) => {
+      const feature = event.features && event.features[0];
+      if (feature?.properties?.id) {
+        selectCountry(Number(feature.properties.id), false);
+      }
+    });
+
+    if (initialHashState.country && countryById.has(initialHashState.country)) {
+      selectCountry(initialHashState.country, false);
+    } else {
+      updateCountryStat();
+    }
+  }
+
+  // ───────────────────── charger markers ─────────────────────────────────────
+  async function loadChargers() {
+    const data = await (await fetch('./chargers.json')).json();
+    const pos = data.positions;
+    const features = [];
+    for (let i = 0; i < pos.length; i += 2) {
+      features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [pos[i], pos[i + 1]] }, properties: null });
+    }
+    map.addSource('chargers', { type: 'geojson', data: { type: 'FeatureCollection', features } });
+    map.addLayer({
+      id: 'chargers',
+      type: 'circle',
+      source: 'chargers',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 1.5, 7, 2.5, 12, 4.5, 16, 7],
+        'circle-color': '#e82127',
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 1,
+        'circle-stroke-opacity': 0.85,
+        'circle-opacity': 0.95,
+      },
+    }, 'carto_labels');
+  }
+
+  async function setDistanceSource(source, updateHash = true) {
+    if (!DISTANCE_SOURCES[source] || source === distanceSource) return;
+    const previous = distanceSource;
+    distanceSource = source;
+    syncSourceButtons();
+    coverageLayer.setDistanceSource(distanceSource);
+    status.textContent = `Loading ${source} distance outputs...`;
 
     try {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const d = await r.json();
-
-      const pixels = Array.isArray(d.pixels) ? d.pixels : [];
-      const layer  = buildLayer(pixels, d.mode || 'native', d.cell_m || 100);
-      deckgl.setProps({ layers: layer ? [layer] : [] });
-
-      const vp = d.viewport || {};
-      viewportStat.textContent = `${fmt(vp.pop_covered ?? 0)} / ${fmt(vp.pop_total ?? 0)} (${((vp.fraction ?? 0)*100).toFixed(1)}%)`;
-      const modeTag = d.mode === 'aggregated' ? ` · ${Math.round(d.cell_m)}m cells` : '';
-      status.textContent = `${(d.count ?? 0).toLocaleString()} cells${d.truncated ? ' (capped)' : ''}${modeTag}`;
-    } catch(e) {
-      deckgl.setProps({ layers: [] });
-      status.textContent = 'Error: ' + e.message;
+      await Promise.all([loadGlobal(), loadCountryStats()]);
+      updateGlobalStat();
+      updateCountryStat();
+      updateViewportStat();
+      status.textContent = '';
+      if (updateHash) scheduleHashUpdate();
+    } catch (error) {
+      distanceSource = previous;
+      syncSourceButtons();
+      coverageLayer.setDistanceSource(distanceSource);
+      status.textContent = `Distance source unavailable: ${error.message}`;
+      await Promise.all([loadGlobal(), loadCountryStats()]);
+      updateGlobalStat();
+      updateCountryStat();
     }
   }
 
-  function scheduleUpdate() {
-    clearTimeout(fetchTimer);
-    fetchTimer = setTimeout(fetchPixels, 400);
+  // ───────────────────── search / jump-to-place ─────────────────────────────
+  const nominatimGeocoderApi = {
+    async forwardGeocode(config) {
+      const query = (config.query || '').trim();
+      if (!query) return { features: [] };
+
+      const url = new URL('https://nominatim.openstreetmap.org/search');
+      url.searchParams.set('q', query);
+      url.searchParams.set('format', 'geojson');
+      url.searchParams.set('limit', '6');
+      url.searchParams.set('addressdetails', '1');
+      url.searchParams.set('accept-language', navigator.language || 'en');
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Search failed (${response.status})`);
+      }
+
+      const geojson = await response.json();
+      const features = [];
+      for (const feature of geojson.features || []) {
+        const props = feature.properties || {};
+        const bbox = feature.bbox;
+        let center = null;
+        if (Array.isArray(bbox) && bbox.length >= 4) {
+          center = [
+            bbox[0] + (bbox[2] - bbox[0]) / 2,
+            bbox[1] + (bbox[3] - bbox[1]) / 2,
+          ];
+        } else if (feature.geometry && feature.geometry.type === 'Point') {
+          center = feature.geometry.coordinates;
+        }
+        if (!center) continue;
+
+        features.push({
+          type: 'Feature',
+          geometry: feature.geometry,
+          place_name: props.display_name || props.name || query,
+          text: props.name || props.display_name || query,
+          center,
+          bbox,
+          properties: props,
+        });
+      }
+      return { features };
+    },
+  };
+
+  function addSearchControl() {
+    const GeocoderControl = window.MaplibreGeocoder && (window.MaplibreGeocoder.default || window.MaplibreGeocoder);
+    if (!GeocoderControl) {
+      status.textContent = 'Search unavailable: geocoder plugin did not load';
+      return;
+    }
+
+    const geocoder = new GeocoderControl(nominatimGeocoderApi, {
+      mapboxgl: maplibregl,
+      marker: false,
+      placeholder: 'Search city or place',
+      zoom: 10,
+      flyTo: {
+        speed: 1.2,
+        curve: 1.4,
+        essential: true,
+      },
+      showResultsWhileTyping: false,
+      collapsed: false,
+    });
+    document.getElementById('search-control').appendChild(geocoder.onAdd(map));
   }
 
+  // ─────────────────────────────── interactions ───────────────────────────────
+  function applyRadius() {
+    radiusInput.value = String(currentRadius);
+    coverageLayer.setRadius(currentRadius);
+    updateGlobalStat();
+    updateViewportStat();
+    updateCountryStat();
+    syncPresetChips();
+  }
+
+  function syncPresetChips() {
+    for (const chip of document.querySelectorAll('#preset-chips .chip')) {
+      const km = Number(chip.dataset.km);
+      chip.classList.toggle('active', km === currentRadius);
+    }
+  }
+  function syncCountryClear() {
+    document.getElementById('country-clear').classList.toggle('visible', !!selectedCountryId);
+  }
+
+  function setRadius(radiusKm) {
+    currentRadius = Math.max(0, Math.min(MAX_RADIUS_KM, Math.round(radiusKm)));
+    slider.value = kmToSlider(currentRadius);
+    applyRadius();
+    scheduleHashUpdate();
+  }
+
+  slider.value = kmToSlider(currentRadius);
+  radiusInput.value = String(currentRadius);
+  syncModeButtons();
+  syncSourceButtons();
+
   slider.addEventListener('input', () => {
-    currentRadius = parseInt(slider.value);
-    radiusLabel.textContent = currentRadius + ' km';
-    fetchCoverage(currentRadius);
-    scheduleUpdate();
+    setRadius(sliderToKm(parseInt(slider.value, 10)));
   });
 
-  map.on('moveend', scheduleUpdate);
-  map.on('zoomend', scheduleUpdate);
+  radiusInput.addEventListener('change', () => {
+    const value = Number(radiusInput.value);
+    if (Number.isFinite(value)) {
+      setRadius(value);
+    } else {
+      radiusInput.value = String(currentRadius);
+    }
+  });
 
-  map.on('load', () => {
-    syncSize();
-    syncViewState();
-    fetchCoverage(currentRadius);
-    fetchPixels();
+  for (const button of modeButtons) {
+    button.addEventListener('click', () => {
+      displayMode = button.dataset.mode;
+      syncModeButtons();
+      coverageLayer.setDisplayMode(displayMode);
+      scheduleHashUpdate();
+    });
+  }
+
+  for (const button of sourceButtons) {
+    button.addEventListener('click', () => {
+      setDistanceSource(button.dataset.source);
+    });
+  }
+
+  countrySelect.addEventListener('change', () => {
+    const id = Number(countrySelect.value);
+    selectCountry(Number.isFinite(id) && id > 0 ? id : null);
+  });
+
+  document.getElementById('country-clear').addEventListener('click', () => {
+    selectCountry(null, false);
+  });
+
+  for (const chip of document.querySelectorAll('#preset-chips .chip')) {
+    chip.addEventListener('click', () => {
+      setRadius(Number(chip.dataset.km));
+    });
+  }
+
+  const aboutToggle = document.getElementById('about-toggle');
+  const aboutPanel = document.getElementById('about-panel');
+  aboutToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = aboutPanel.classList.toggle('open');
+    aboutToggle.classList.toggle('active', open);
+  });
+  document.addEventListener('click', (e) => {
+    if (!aboutPanel.classList.contains('open')) return;
+    if (aboutPanel.contains(e.target) || aboutToggle.contains(e.target)) return;
+    aboutPanel.classList.remove('open');
+    aboutToggle.classList.remove('active');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && aboutPanel.classList.contains('open')) {
+      aboutPanel.classList.remove('open');
+      aboutToggle.classList.remove('active');
+    }
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const step = e.shiftKey ? 10 : 1;
+      setRadius(currentRadius + (e.key === 'ArrowRight' ? step : -step));
+      e.preventDefault();
+    } else if (e.key === '?') {
+      aboutToggle.click();
+    }
+  });
+
+  const shareBtn = document.getElementById('share-btn');
+  const shareLabel = document.getElementById('share-label');
+  shareBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+    } catch (_) {
+      const tmp = document.createElement('textarea');
+      tmp.value = location.href;
+      document.body.appendChild(tmp);
+      tmp.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      tmp.remove();
+    }
+    shareBtn.classList.add('copied');
+    shareLabel.textContent = 'Copied';
+    setTimeout(() => {
+      shareBtn.classList.remove('copied');
+      shareLabel.textContent = 'Share';
+    }, 1400);
+  });
+
+  syncPresetChips();
+  syncCountryClear();
+
+  map.on('moveend', () => {
+    updateViewportStat();
+    scheduleHashUpdate();
+  });
+  map.on('zoomend', () => {
+    updateViewportStat();
+    scheduleHashUpdate();
+  });
+
+  window.addEventListener('hashchange', () => {
+    applyHashState(parseHashState());
+  });
+
+  map.on('mousemove', (e) => {
+    const z = MAX_NATIVE_ZOOM;
+    const { lng, lat } = e.lngLat;
+    const { tx, ty, px, py } = lngLatToTilePixel(lng, lat, z);
+    const entry = coverageLayer.tiles.get(`${z}/${tx}/${ty}`);
+    if (!entry || entry.status !== 'loaded' || !entry.image) {
+      hoverEl.style.display = 'none';
+      return;
+    }
+
+    const [r, g, , a] = readCoveragePixel(entry, px, py);
+    const dist = decodeDistKm(r, g, a);
+    const pop = decodePop(a);
+    if (dist === null) {
+      hoverEl.style.display = 'none';
+      return;
+    }
+
+    const parts = [`Distance: ${dist.toFixed(1)} km`];
+    if (pop !== null && pop > 0) {
+      const popText = pop > 1000
+        ? `${(pop / 1000).toFixed(1)}k`
+        : `${Math.round(pop)}`;
+      parts.push(`Population: ${popText}`);
+    }
+    hoverEl.textContent = parts.join(' · ');
+    hoverEl.style.left = `${e.point.x + 12}px`;
+    hoverEl.style.top = `${e.point.y + 12}px`;
+    hoverEl.style.display = 'block';
+  });
+
+  map.getCanvas().addEventListener('mouseleave', () => {
+    hoverEl.style.display = 'none';
+  });
+
+  map.on('load', async () => {
+    try {
+      map.addLayer(coverageLayer);
+      await loadCountries();
+      map.addLayer({ id: 'carto_labels', type: 'raster', source: 'carto_labels' });
+      await Promise.all([loadGlobal(), loadChargers()]);
+      applyRadius();
+      status.textContent = '';
+      addSearchControl();
+    } catch (e) {
+      status.textContent = 'Load error: ' + e.message;
+    }
   });
 </script>
 </body>

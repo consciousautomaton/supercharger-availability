@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Review Unassigned Superchargers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #202124;
+      background: #f7f7f3;
+    }
+    #map {
+      position: fixed;
+      inset: 0 0 0 360px;
+    }
+    #panel {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 360px;
+      overflow: auto;
+      padding: 16px;
+      background: #fff;
+      border-right: 1px solid #d8d8d2;
+      z-index: 2;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 650;
+    }
+    .sub {
+      margin: 0 0 14px;
+      color: #666;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .row {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0;
+    }
+    label {
+      font-size: 12px;
+      color: #555;
+      font-weight: 600;
+    }
+    select, input, textarea, button {
+      width: 100%;
+      font: inherit;
+      border: 1px solid #c8c8c2;
+      border-radius: 6px;
+      background: #fff;
+    }
+    select, input {
+      min-height: 34px;
+      padding: 6px 8px;
+    }
+    button {
+      min-height: 34px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary {
+      color: #fff;
+      background: #e82127;
+      border-color: #e82127;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .buttons.three {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+    #selected {
+      margin: 12px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fafafa;
+      font-size: 13px;
+      line-height: 1.45;
+      min-height: 74px;
+    }
+    #list {
+      margin-top: 12px;
+      display: grid;
+      gap: 6px;
+    }
+    .item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 7px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .item.active {
+      border-color: #e82127;
+      box-shadow: 0 0 0 2px rgba(232, 33, 39, 0.12);
+    }
+    .item.assigned {
+      border-color: #30b36b;
+      background: #f2fbf6;
+    }
+    .muted { color: #777; }
+    .pill {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #eee;
+      color: #444;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .assigned .pill {
+      background: #dff4e8;
+      color: #176a3b;
+    }
+    textarea {
+      min-height: 120px;
+      padding: 8px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+    }
+    #status {
+      margin: 10px 0;
+      font-size: 12px;
+      color: #555;
+    }
+    #area-status {
+      margin: 8px 0 0;
+      padding: 8px;
+      border-radius: 7px;
+      background: #f4f4ef;
+      color: #555;
+      font-size: 12px;
+      line-height: 1.35;
+      display: none;
+    }
+    #area-status.active {
+      display: block;
+    }
+    @media (max-width: 760px) {
+      #panel {
+        width: 100%;
+        height: 42vh;
+        inset: auto 0 0 0;
+        border-right: 0;
+        border-top: 1px solid #d8d8d2;
+      }
+      #map {
+        inset: 0 0 42vh 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside id="panel">
+    <h1>Unassigned Superchargers</h1>
+    <p class="sub">Click a red charger, then choose a country or click a country polygon. Export the overrides CSV when done.</p>
+
+    <div id="status">Loading...</div>
+
+    <div id="selected">No charger selected.</div>
+
+    <div class="row">
+      <label for="country-filter">Country</label>
+      <input id="country-filter" type="search" placeholder="Filter countries">
+      <select id="country-select"></select>
+    </div>
+
+    <div class="buttons">
+      <button id="assign-btn" class="primary" disabled>Assign</button>
+      <button id="clear-btn" disabled>Clear</button>
+    </div>
+
+    <div class="row">
+      <label>Area tools</label>
+      <div class="buttons three">
+        <button id="assign-visible-btn">Assign visible</button>
+        <button id="area-btn">Area select</button>
+        <button id="area-confirm-btn" disabled>Confirm</button>
+      </div>
+      <button id="area-cancel-btn" disabled>Cancel area selection</button>
+      <div id="area-status"></div>
+    </div>
+
+    <div class="row">
+      <div class="buttons">
+        <button id="apply-csv-btn">Apply CSV edits</button>
+        <button id="export-btn">Export CSV</button>
+      </div>
+      <textarea id="csv-output" spellcheck="false"></textarea>
+    </div>
+
+    <div id="list"></div>
+  </aside>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+  <script>
+    const STORAGE_KEY = 'tesla-country-charger-overrides-v1';
+
+    const statusEl = document.getElementById('status');
+    const selectedEl = document.getElementById('selected');
+    const countryFilterEl = document.getElementById('country-filter');
+    const countrySelectEl = document.getElementById('country-select');
+    const assignBtn = document.getElementById('assign-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const assignVisibleBtn = document.getElementById('assign-visible-btn');
+    const areaBtn = document.getElementById('area-btn');
+    const areaConfirmBtn = document.getElementById('area-confirm-btn');
+    const areaCancelBtn = document.getElementById('area-cancel-btn');
+    const areaStatusEl = document.getElementById('area-status');
+    const applyCsvBtn = document.getElementById('apply-csv-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const csvOutputEl = document.getElementById('csv-output');
+    const listEl = document.getElementById('list');
+
+    let countries = [];
+    let chargerData = null;
+    let selectedIndex = null;
+    let assignments = loadAssignments();
+    let areaMode = false;
+    let areaFirstCorner = null;
+    let pendingArea = null;
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          base: {
+            type: 'raster',
+            tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png'],
+            tileSize: 512,
+            attribution: '© OpenStreetMap © CARTO',
+          },
+        },
+        layers: [
+          { id: 'base', type: 'raster', source: 'base' },
+        ],
+      },
+      center: [8, 35],
+      zoom: 1.5,
+      maxZoom: 16,
+    });
+
+    function loadAssignments() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveAssignments() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(assignments));
+    }
+
+    function chargerFeatures() {
+      return chargerData.features.map((feature) => {
+        const index = String(feature.properties.index);
+        const country = assignments[index];
+        return {
+          ...feature,
+          properties: {
+            ...feature.properties,
+            selected: index === String(selectedIndex),
+            assigned_iso_a3: country?.iso_a3 || '',
+            assigned_name: country?.name || '',
+          },
+        };
+      });
+    }
+
+    function refreshChargerSource() {
+      if (!chargerData || !map.getSource('chargers')) return;
+      map.getSource('chargers').setData({
+        type: 'FeatureCollection',
+        features: chargerFeatures(),
+      });
+    }
+
+    function setAreaStatus(message) {
+      areaStatusEl.textContent = message || '';
+      areaStatusEl.classList.toggle('active', Boolean(message));
+    }
+
+    function setAreaMode(active) {
+      areaMode = active;
+      areaFirstCorner = null;
+      pendingArea = null;
+      areaBtn.disabled = active;
+      areaConfirmBtn.disabled = true;
+      areaCancelBtn.disabled = !active;
+      map.getCanvas().style.cursor = active ? 'crosshair' : '';
+      setAreaStatus(active ? 'Click the first corner of the rectangle.' : '');
+      updateAreaSource(null);
+    }
+
+    function lngLatBoundsFromCorners(a, b) {
+      const west = Math.min(a.lng, b.lng);
+      const east = Math.max(a.lng, b.lng);
+      const south = Math.min(a.lat, b.lat);
+      const north = Math.max(a.lat, b.lat);
+      return { west, south, east, north };
+    }
+
+    function boundsPolygon(bounds) {
+      return {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [bounds.west, bounds.south],
+            [bounds.east, bounds.south],
+            [bounds.east, bounds.north],
+            [bounds.west, bounds.north],
+            [bounds.west, bounds.south],
+          ]],
+        },
+      };
+    }
+
+    function updateAreaSource(bounds) {
+      const source = map.getSource('selection-area');
+      if (!source) return;
+      source.setData({
+        type: 'FeatureCollection',
+        features: bounds ? [boundsPolygon(bounds)] : [],
+      });
+    }
+
+    function chargerInBounds(feature, bounds) {
+      const [lon, lat] = feature.geometry.coordinates;
+      return lon >= bounds.west && lon <= bounds.east && lat >= bounds.south && lat <= bounds.north;
+    }
+
+    function assignFeatures(features, country) {
+      if (!country || !features.length) return 0;
+      let count = 0;
+      features.forEach((feature) => {
+        const index = String(feature.properties.index);
+        if (!assignments[index]) {
+          assignments[index] = { iso_a3: country.iso_a3, name: country.name };
+          count += 1;
+        }
+      });
+      saveAssignments();
+      refreshAll();
+      return count;
+    }
+
+    function assignPendingArea() {
+      if (!pendingArea) return;
+      const count = assignFeatures(pendingArea.features, pendingArea.country);
+      const countryName = pendingArea.country.name;
+      pendingArea = null;
+      setAreaMode(false);
+      setAreaStatus(`Assigned ${count} chargers in area to ${countryName}.`);
+    }
+
+    function cancelAreaSelection() {
+      setAreaMode(false);
+      setAreaStatus('Area selection canceled.');
+    }
+
+    function assignVisible() {
+      const country = selectedCountry();
+      if (!country || !chargerData) return;
+      const bounds = map.getBounds();
+      const visible = chargerData.features.filter((feature) => {
+        const index = String(feature.properties.index);
+        return !assignments[index] && bounds.contains(feature.geometry.coordinates);
+      });
+      const count = assignFeatures(visible, country);
+      setAreaStatus(`Assigned ${count} visible chargers to ${country.name}.`);
+    }
+
+    function handleAreaClick(event) {
+      if (!areaMode) return false;
+      if (event.originalEvent?.__areaHandled) return true;
+      if (event.originalEvent) event.originalEvent.__areaHandled = true;
+      const country = selectedCountry();
+      if (!country) {
+        setAreaStatus('Choose a country first.');
+        return true;
+      }
+      if (!areaFirstCorner) {
+        areaFirstCorner = event.lngLat;
+        setAreaStatus('Click the opposite corner of the rectangle.');
+        return true;
+      }
+
+      const bounds = lngLatBoundsFromCorners(areaFirstCorner, event.lngLat);
+      updateAreaSource(bounds);
+      const selected = chargerData.features.filter((feature) => {
+        const index = String(feature.properties.index);
+        return !assignments[index] && chargerInBounds(feature, bounds);
+      });
+      pendingArea = { bounds, features: selected, country };
+      areaMode = false;
+      areaConfirmBtn.disabled = false;
+      areaCancelBtn.disabled = false;
+      areaBtn.disabled = true;
+      map.getCanvas().style.cursor = '';
+      setAreaStatus(`Rectangle selected ${selected.length} unassigned chargers for ${country.name}. Confirm or cancel.`);
+      return true;
+    }
+
+    function formatCoord(value) {
+      return Number(value).toFixed(6);
+    }
+
+    function selectedFeature() {
+      if (selectedIndex == null || !chargerData) return null;
+      return chargerData.features.find((f) => String(f.properties.index) === String(selectedIndex)) || null;
+    }
+
+    function selectedCountry() {
+      const value = countrySelectEl.value;
+      return countries.find((country) => country.iso_a3 === value) || null;
+    }
+
+    function updateStatus() {
+      const total = chargerData?.features.length || 0;
+      const assigned = Object.keys(assignments).length;
+      statusEl.textContent = `${assigned} / ${total} chargers manually assigned`;
+    }
+
+    function updateSelectedPanel() {
+      const feature = selectedFeature();
+      assignBtn.disabled = !feature || !selectedCountry();
+      clearBtn.disabled = !feature || !assignments[String(selectedIndex)];
+
+      if (!feature) {
+        selectedEl.textContent = 'No charger selected.';
+        return;
+      }
+
+      const [lon, lat] = feature.geometry.coordinates;
+      const assigned = assignments[String(selectedIndex)];
+      selectedEl.innerHTML = `
+        <strong>Charger ${selectedIndex}</strong><br>
+        <span class="muted">${formatCoord(lat)}, ${formatCoord(lon)}</span><br>
+        ${assigned ? `Assigned: <strong>${assigned.name}</strong> (${assigned.iso_a3})` : 'Assigned: none'}
+      `;
+    }
+
+    function updateCsv() {
+      const rows = ['charger_index,iso_a3,country_name'];
+      Object.entries(assignments)
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .forEach(([index, country]) => {
+          rows.push(`${index},${country.iso_a3},"${country.name.replaceAll('"', '""')}"`);
+        });
+      csvOutputEl.value = rows.join('\n') + '\n';
+    }
+
+    function parseCsvLine(line) {
+      const values = [];
+      let value = '';
+      let quoted = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        const next = line[i + 1];
+        if (quoted && char === '"' && next === '"') {
+          value += '"';
+          i += 1;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (!quoted && char === ',') {
+          values.push(value);
+          value = '';
+        } else {
+          value += char;
+        }
+      }
+      values.push(value);
+      return values.map((part) => part.trim());
+    }
+
+    function applyCsvEdits() {
+      const nextAssignments = {};
+      const lines = csvOutputEl.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      lines.forEach((line, i) => {
+        if (i === 0 && line.toLowerCase().startsWith('charger_index,')) return;
+        const [indexRaw, isoRaw, nameRaw = ''] = parseCsvLine(line);
+        const index = String(Number(indexRaw));
+        const iso = (isoRaw || '').trim().toUpperCase();
+        if (!Number.isFinite(Number(indexRaw)) || !iso) return;
+        const country = countries.find((item) => item.iso_a3 === iso);
+        nextAssignments[index] = {
+          iso_a3: iso,
+          name: country?.name || nameRaw || iso,
+        };
+      });
+      assignments = nextAssignments;
+      saveAssignments();
+      refreshAll();
+      setAreaStatus('Applied CSV edits to the review state.');
+    }
+
+    function renderList() {
+      listEl.innerHTML = '';
+      chargerData.features.forEach((feature) => {
+        const index = String(feature.properties.index);
+        const assigned = assignments[index];
+        const [lon, lat] = feature.geometry.coordinates;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = [
+          'item',
+          index === String(selectedIndex) ? 'active' : '',
+          assigned ? 'assigned' : '',
+        ].filter(Boolean).join(' ');
+        item.innerHTML = `
+          <span>
+            <strong>${index}</strong>
+            <span class="muted">${formatCoord(lat)}, ${formatCoord(lon)}</span>
+          </span>
+          <span class="pill">${assigned ? assigned.iso_a3 : 'open'}</span>
+        `;
+        item.addEventListener('click', () => selectCharger(index, true));
+        listEl.appendChild(item);
+      });
+    }
+
+    function selectCharger(index, fly) {
+      selectedIndex = String(index);
+      const feature = selectedFeature();
+      if (feature && fly) {
+        map.flyTo({ center: feature.geometry.coordinates, zoom: Math.max(map.getZoom(), 7) });
+      }
+      refreshChargerSource();
+      updateSelectedPanel();
+      renderList();
+    }
+
+    function assignSelected(country) {
+      const feature = selectedFeature();
+      if (!feature || !country) return;
+      assignments[String(selectedIndex)] = { iso_a3: country.iso_a3, name: country.name };
+      saveAssignments();
+      refreshAll();
+    }
+
+    function clearSelected() {
+      if (selectedIndex == null) return;
+      delete assignments[String(selectedIndex)];
+      saveAssignments();
+      refreshAll();
+    }
+
+    function refreshAll() {
+      refreshChargerSource();
+      updateStatus();
+      updateSelectedPanel();
+      updateCsv();
+      renderList();
+    }
+
+    function populateCountrySelect(filter = '') {
+      const normalized = filter.trim().toLowerCase();
+      countrySelectEl.innerHTML = '';
+      countries
+        .filter((country) => {
+          return !normalized ||
+            country.name.toLowerCase().includes(normalized) ||
+            country.iso_a3.toLowerCase().includes(normalized);
+        })
+        .forEach((country) => {
+          const option = document.createElement('option');
+          option.value = country.iso_a3;
+          option.textContent = `${country.name} (${country.iso_a3})`;
+          countrySelectEl.appendChild(option);
+        });
+      updateSelectedPanel();
+    }
+
+    function exportCsv() {
+      const blob = new Blob([csvOutputEl.value], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'country_charger_overrides.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function fitToUnassigned() {
+      if (!chargerData.features.length) return;
+      const bounds = new maplibregl.LngLatBounds();
+      chargerData.features.forEach((feature) => bounds.extend(feature.geometry.coordinates));
+      map.fitBounds(bounds, { padding: 60, maxZoom: 4 });
+    }
+
+    map.on('load', async () => {
+      const [countryGeojson, unassignedGeojson] = await Promise.all([
+        fetch('./countries.geojson').then((r) => r.json()),
+        fetch('./unassigned_chargers.geojson').then((r) => r.json()),
+      ]);
+
+      countries = countryGeojson.features
+        .map((feature) => ({
+          id: feature.properties.id,
+          iso_a3: feature.properties.iso_a3,
+          name: feature.properties.name,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      chargerData = unassignedGeojson;
+      populateCountrySelect();
+
+      map.addSource('countries', { type: 'geojson', data: countryGeojson });
+      map.addSource('selection-area', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: 'country-fill',
+        type: 'fill',
+        source: 'countries',
+        paint: {
+          'fill-color': '#2b75ff',
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 0.22,
+            0.035,
+          ],
+        },
+      });
+      map.addLayer({
+        id: 'country-line',
+        type: 'line',
+        source: 'countries',
+        paint: {
+          'line-color': '#2563eb',
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false], 2,
+            0.7,
+          ],
+          'line-opacity': 0.75,
+        },
+      });
+      map.addLayer({
+        id: 'selection-area-fill',
+        type: 'fill',
+        source: 'selection-area',
+        paint: {
+          'fill-color': '#e82127',
+          'fill-opacity': 0.12,
+        },
+      });
+      map.addLayer({
+        id: 'selection-area-line',
+        type: 'line',
+        source: 'selection-area',
+        paint: {
+          'line-color': '#e82127',
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+        },
+      });
+
+      map.addSource('chargers', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: chargerFeatures() },
+      });
+      map.addLayer({
+        id: 'chargers',
+        type: 'circle',
+        source: 'chargers',
+        paint: {
+          'circle-radius': [
+            'case',
+            ['get', 'selected'], 8,
+            ['!=', ['get', 'assigned_iso_a3'], ''], 5,
+            6,
+          ],
+          'circle-color': [
+            'case',
+            ['!=', ['get', 'assigned_iso_a3'], ''], '#30b36b',
+            '#e82127',
+          ],
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': [
+            'case',
+            ['get', 'selected'], 3,
+            1.5,
+          ],
+        },
+      });
+
+      let hoveredCountryId = null;
+      map.on('mousemove', 'country-fill', (event) => {
+        const feature = event.features[0];
+        if (hoveredCountryId !== null) {
+          map.setFeatureState({ source: 'countries', id: hoveredCountryId }, { hover: false });
+        }
+        hoveredCountryId = feature.id;
+        map.setFeatureState({ source: 'countries', id: hoveredCountryId }, { hover: true });
+      });
+      map.on('mouseleave', 'country-fill', () => {
+        if (hoveredCountryId !== null) {
+          map.setFeatureState({ source: 'countries', id: hoveredCountryId }, { hover: false });
+        }
+        hoveredCountryId = null;
+      });
+
+      map.on('click', 'chargers', (event) => {
+        if (areaMode) return;
+        const feature = event.features[0];
+        selectCharger(feature.properties.index, false);
+      });
+      map.on('click', 'country-fill', (event) => {
+        if (handleAreaClick(event)) return;
+        if (selectedIndex == null) return;
+        const feature = event.features[0];
+        const country = countries.find((c) => c.id === feature.properties.id);
+        if (country) {
+          countrySelectEl.value = country.iso_a3;
+          assignSelected(country);
+        }
+      });
+      map.on('click', (event) => {
+        handleAreaClick(event);
+      });
+      map.on('mousemove', (event) => {
+        if (areaMode && areaFirstCorner) {
+          updateAreaSource(lngLatBoundsFromCorners(areaFirstCorner, event.lngLat));
+        }
+      });
+
+      map.on('mouseenter', 'chargers', () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'chargers', () => { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'country-fill', () => { map.getCanvas().style.cursor = 'crosshair'; });
+      map.on('mouseleave', 'country-fill', () => { map.getCanvas().style.cursor = ''; });
+
+      refreshAll();
+      fitToUnassigned();
+    });
+
+    countryFilterEl.addEventListener('input', () => populateCountrySelect(countryFilterEl.value));
+    countrySelectEl.addEventListener('change', updateSelectedPanel);
+    assignBtn.addEventListener('click', () => assignSelected(selectedCountry()));
+    clearBtn.addEventListener('click', clearSelected);
+    assignVisibleBtn.addEventListener('click', assignVisible);
+    areaBtn.addEventListener('click', () => setAreaMode(true));
+    areaConfirmBtn.addEventListener('click', assignPendingArea);
+    areaCancelBtn.addEventListener('click', cancelAreaSelection);
+    applyCsvBtn.addEventListener('click', applyCsvEdits);
+    exportBtn.addEventListener('click', exportCsv);
+  </script>
+</body>
+</html>

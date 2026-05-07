@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>precompute_tiles.py progress</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #181a20;
+      --text: #f2f2f2;
+      --muted: #a7abb6;
+      --grid: #30343d;
+      --red: #f25555;
+      --blue: #69a7ff;
+      --orange: #ffb15c;
+      --green: #72d67a;
+      --purple: #b38cff;
+      --cyan: #5fd0d5;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Segoe UI, system-ui, sans-serif;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 650;
+    }
+
+    p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .metric, .chart {
+      background: var(--panel);
+      border: 1px solid #292c34;
+      border-radius: 8px;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    .metric {
+      padding: 14px 16px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .value {
+      margin-top: 5px;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .chart {
+      margin-top: 14px;
+      padding: 16px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 320px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .key {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 3px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    @media (max-width: 760px) {
+      main { padding: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      canvas { height: 280px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>precompute_tiles.py z=11 Progress</h1>
+  <p>
+    Parsed from the console output you pasted. The steep section from about row
+    544 onward is the dense northern-hemisphere band turning into a lot of z11
+    tile work. The projection is a rough model, useful for shape and ETA range.
+  </p>
+
+  <section class="grid">
+    <div class="metric">
+      <div class="label">Latest row</div>
+      <div class="value" id="latest-row"></div>
+    </div>
+    <div class="metric">
+      <div class="label">Elapsed</div>
+      <div class="value" id="elapsed"></div>
+    </div>
+    <div class="metric">
+      <div class="label">z11 tiles written</div>
+      <div class="value" id="z11"></div>
+    </div>
+    <div class="metric">
+      <div class="label">Local-rate ETA</div>
+      <div class="value" id="local-eta"></div>
+    </div>
+    <div class="metric">
+      <div class="label">z8-curve ETA</div>
+      <div class="value" id="curve-eta"></div>
+    </div>
+    <div class="metric">
+      <div class="label">z8 reference progress</div>
+      <div class="value" id="z8-progress"></div>
+    </div>
+    <div class="metric">
+      <div class="label">z8-scaled z11 total</div>
+      <div class="value" id="z8-z11-total"></div>
+    </div>
+  </section>
+
+  <section class="chart">
+    <canvas id="elapsed-chart" aria-label="Elapsed seconds by row"></canvas>
+    <div class="legend">
+      <span class="key" style="color: var(--red)"><span class="swatch"></span>elapsed seconds</span>
+    </div>
+  </section>
+
+  <section class="chart">
+    <canvas id="tiles-chart" aria-label="Tiles written by zoom"></canvas>
+    <div class="legend" id="tiles-legend"></div>
+  </section>
+
+  <section class="chart">
+    <canvas id="cost-chart" aria-label="Interval cost and throughput"></canvas>
+    <div class="legend">
+      <span class="key" style="color: var(--blue)"><span class="swatch"></span>seconds per 32 rows</span>
+      <span class="key" style="color: var(--orange)"><span class="swatch"></span>new z11 tiles per second</span>
+      <span class="key" style="color: var(--green)"><span class="swatch"></span>in-flight jobs</span>
+    </div>
+  </section>
+
+  <section class="chart">
+    <canvas id="phase-chart" aria-label="Bottom zoom versus upper pyramid tiles"></canvas>
+    <div class="legend">
+      <span class="key" style="color: var(--red)"><span class="swatch"></span>bottom detail tiles, z11</span>
+      <span class="key" style="color: var(--blue)"><span class="swatch"></span>upper pyramid tiles, z0-z10</span>
+      <span class="key" style="color: var(--green)"><span class="swatch"></span>upper / bottom ratio</span>
+    </div>
+  </section>
+
+  <section class="chart">
+    <canvas id="projection-chart" aria-label="S-curve projection"></canvas>
+    <div class="legend">
+      <span class="key" style="color: var(--red)"><span class="swatch"></span>observed elapsed</span>
+      <span class="key" style="color: var(--purple)"><span class="swatch"></span>z8-calibrated time projection</span>
+      <span class="key" style="color: var(--orange)"><span class="swatch"></span>z8-calibrated z11 curve</span>
+      <span class="key" style="color: var(--cyan)"><span class="swatch"></span>old z8 tile fraction</span>
+    </div>
+  </section>
+
+  <section class="chart">
+    <canvas id="phase-breakdown-chart" aria-label="Old z8 explicit phase breakdown"></canvas>
+    <div class="legend">
+      <span class="key" style="color: var(--green)"><span class="swatch"></span>bottom render</span>
+      <span class="key" style="color: var(--orange)"><span class="swatch"></span>encode/build pyramid</span>
+      <span class="key" style="color: var(--purple)"><span class="swatch"></span>current z11 streaming total</span>
+    </div>
+  </section>
+</main>
+
+<script>
+const samples = [
+  { row: 32, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 64, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 96, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 128, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 160, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 192, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 224, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 256, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 288, elapsed: 0.0, inflight: 0, z: {} },
+  { row: 320, elapsed: 0.2, inflight: 4, z: {5: 4, 6: 5, 7: 8, 8: 10, 9: 13, 10: 17, 11: 19} },
+  { row: 352, elapsed: 0.3, inflight: 8, z: {5: 4, 6: 9, 7: 13, 8: 16, 9: 19, 10: 24, 11: 28} },
+  { row: 384, elapsed: 0.5, inflight: 5, z: {4: 8, 5: 12, 6: 14, 7: 19, 8: 24, 9: 28, 10: 34, 11: 44} },
+  { row: 416, elapsed: 1.2, inflight: 17, z: {4: 8, 5: 12, 6: 30, 7: 47, 8: 63, 9: 89, 10: 119, 11: 170} },
+  { row: 448, elapsed: 2.8, inflight: 19, z: {4: 8, 5: 35, 6: 58, 7: 97, 8: 147, 9: 219, 10: 314, 11: 434} },
+  { row: 480, elapsed: 8.3, inflight: 44, z: {4: 8, 5: 35, 6: 99, 7: 190, 8: 330, 9: 574, 10: 987, 11: 1667} },
+  { row: 512, elapsed: 16.7, inflight: 2, z: {2: 4, 3: 8, 4: 23, 5: 63, 6: 144, 7: 318, 8: 605, 9: 1111, 10: 2046, 11: 3586} },
+  { row: 544, elapsed: 32.4, inflight: 31, z: {2: 4, 3: 8, 4: 23, 5: 63, 6: 196, 7: 474, 8: 997, 9: 1985, 10: 3928, 11: 7608} },
+  { row: 576, elapsed: 59.6, inflight: 18, z: {2: 4, 3: 8, 4: 23, 5: 95, 6: 250, 7: 642, 8: 1499, 9: 3258, 10: 7015, 11: 14836} },
+  { row: 608, elapsed: 92.9, inflight: 45, z: {2: 4, 3: 8, 4: 23, 5: 95, 6: 300, 7: 817, 8: 2007, 9: 4600, 10: 10477, 11: 23542} },
+  { row: 640, elapsed: 141.4, inflight: 10, z: {2: 4, 3: 8, 4: 39, 5: 125, 6: 349, 7: 973, 8: 2502, 9: 6055, 10: 14724, 11: 36249} },
+  { row: 672, elapsed: 219.0, inflight: 37, z: {2: 4, 3: 8, 4: 39, 5: 125, 6: 398, 7: 1136, 8: 3057, 9: 7830, 10: 20470, 11: 55141} },
+  { row: 704, elapsed: 321.4, inflight: 24, z: {2: 4, 3: 8, 4: 39, 5: 152, 6: 444, 7: 1301, 8: 3656, 9: 9937, 10: 27485, 11: 77442} },
+  { row: 736, elapsed: 439.2, inflight: 47, z: {2: 4, 3: 8, 4: 39, 5: 152, 6: 487, 7: 1465, 8: 4275, 9: 12199, 10: 35323, 11: 102822} },
+  { row: 768, elapsed: 558.4, inflight: 6, z: {2: 4, 3: 16, 4: 53, 5: 175, 6: 529, 7: 1622, 8: 4845, 9: 14252, 10: 42558, 11: 127251} },
+  { row: 800, elapsed: 682.0, inflight: 27, z: {2: 4, 3: 16, 4: 53, 5: 175, 6: 570, 7: 1771, 8: 5374, 9: 16147, 10: 49251, 11: 150585} },
+  { row: 832, elapsed: 806.3, inflight: 19, z: {2: 4, 3: 16, 4: 53, 5: 198, 6: 610, 7: 1910, 8: 5859, 9: 17899, 10: 55579, 11: 172612} },
+  { row: 864, elapsed: 912.9, inflight: 38, z: {2: 4, 3: 16, 4: 53, 5: 198, 6: 647, 7: 2041, 8: 6345, 9: 19654, 10: 61590, 11: 191925} },
+  { row: 896, elapsed: 1004.4, inflight: 14, z: {2: 4, 3: 16, 4: 67, 5: 220, 6: 685, 7: 2170, 8: 6800, 9: 21192, 10: 66581, 11: 208490} },
+  { row: 928, elapsed: 1071.0, inflight: 35, z: {2: 4, 3: 16, 4: 67, 5: 220, 6: 722, 7: 2293, 8: 7211, 9: 22504, 10: 70665, 11: 220964} },
+  { row: 960, elapsed: 1174.7, inflight: 29, z: {2: 4, 3: 16, 4: 67, 5: 245, 6: 757, 7: 2396, 8: 7546, 9: 23694, 10: 74938, 11: 236430} },
+];
+
+const colors = {
+  5: '#72d67a',
+  6: '#5fd0d5',
+  7: '#69a7ff',
+  8: '#b38cff',
+  9: '#ff8ad4',
+  10: '#ffb15c',
+  11: '#f25555',
+};
+
+const z8Reference = [
+  { row: 48 * 8, tiles: 24, elapsed: 0.0 },
+  { row: 64 * 8, tiles: 605, elapsed: 0.2 },
+  { row: 80 * 8, tiles: 2502, elapsed: 1.0 },
+  { row: 96 * 8, tiles: 4845, elapsed: 10.0 },
+  { row: 112 * 8, tiles: 6800, elapsed: 31.3 },
+  { row: 128 * 8, tiles: 8229, elapsed: 45.9 },
+  { row: 144 * 8, tiles: 9558, elapsed: 53.9 },
+  { row: 160 * 8, tiles: 10277, elapsed: 56.6 },
+  { row: 176 * 8, tiles: 10423, elapsed: 56.8 },
+  { row: 2048, tiles: 10426, elapsed: 140.8 },
+];
+
+const z8FinalTiles = 10426;
+const oldZ8Phases = [
+  { name: 'render z8 raw', seconds: 57.7, color: '#72d67a' },
+  { name: 'encode z8 PNG', seconds: 52.4, color: '#ffb15c' },
+  { name: 'build/write z7', seconds: 21.0, color: '#ffb15c' },
+  { name: 'build/write z6', seconds: 6.7, color: '#ffb15c' },
+  { name: 'build/write z5', seconds: 2.0, color: '#ffb15c' },
+  { name: 'build/write z4-z0', seconds: 1.0, color: '#ffb15c' },
+];
+const completedZ11Seconds = 2196.3;
+
+const latest = samples.at(-1);
+document.getElementById('latest-row').textContent = `${latest.row} / 2048`;
+document.getElementById('elapsed').textContent = `${latest.elapsed.toFixed(1)}s`;
+document.getElementById('z11').textContent = latest.z[11].toLocaleString();
+
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function drawAxes(ctx, w, h, title, yLabel, yMax, yMin = 0, xMin = 32, xMax = latest.row) {
+  const pad = { l: 58, r: 24, t: 34, b: 40 };
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#f2f2f2';
+  ctx.font = '600 15px Segoe UI, sans-serif';
+  ctx.fillText(title, pad.l, 20);
+  ctx.strokeStyle = '#30343d';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#a7abb6';
+  ctx.font = '12px Segoe UI, sans-serif';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + (h - pad.t - pad.b) * i / 5;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.stroke();
+    const value = yMax - (yMax - yMin) * i / 5;
+    ctx.fillText(formatTick(value), 8, y + 4);
+  }
+  for (let i = 0; i <= 4; i++) {
+    const row = xMin + (xMax - xMin) * i / 4;
+    const x = pad.l + (w - pad.l - pad.r) * i / 4;
+    ctx.fillText(Math.round(row), x - 12, h - 14);
+  }
+  ctx.save();
+  ctx.translate(15, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+  return pad;
+}
+
+function formatTick(value) {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  if (value >= 100) return `${Math.round(value)}`;
+  if (value >= 10) return `${value.toFixed(0)}`;
+  return `${value.toFixed(1)}`;
+}
+
+function scaleX(row, pad, w, xMin = 32, xMax = latest.row) {
+  return pad.l + (row - xMin) / (xMax - xMin) * (w - pad.l - pad.r);
+}
+
+function scaleY(value, pad, h, yMax, yMin = 0) {
+  return h - pad.b - (value - yMin) / (yMax - yMin) * (h - pad.t - pad.b);
+}
+
+function niceMax(value) {
+  if (value <= 0) return 1;
+  const power = Math.pow(10, Math.floor(Math.log10(value)));
+  const scaled = value / power;
+  const step = scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10;
+  return step * power;
+}
+
+function lineChart(canvas, series, title, yLabel, yMax, yMin = 0, xMin = 32, xMax = latest.row) {
+  const { ctx, w, h } = setupCanvas(canvas);
+  const pad = drawAxes(ctx, w, h, title, yLabel, yMax, yMin, xMin, xMax);
+  for (const item of series) {
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = item.width || 2;
+    ctx.setLineDash(item.dash || []);
+    ctx.beginPath();
+    item.points.forEach((p, i) => {
+      const x = scaleX(p.row, pad, w, xMin, xMax);
+      const y = scaleY(p.value, pad, h, yMax, yMin);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (item.noPoints) continue;
+    ctx.fillStyle = item.color;
+    item.points.forEach((p) => {
+      const x = scaleX(p.row, pad, w, xMin, xMax);
+      const y = scaleY(p.value, pad, h, yMax, yMin);
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+
+function drawTiles() {
+  const series = [];
+  for (let z = 5; z <= 11; z++) {
+    series.push({
+      color: colors[z],
+      points: samples.map((s) => ({ row: s.row, value: s.z[z] || 0 })),
+    });
+  }
+  lineChart(
+    document.getElementById('tiles-chart'),
+    series,
+    'Cumulative tiles written by zoom',
+    'tiles',
+    niceMax(latest.z[11])
+  );
+}
+
+function drawCost() {
+  const intervals = [];
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1];
+    const curr = samples[i];
+    const dt = curr.elapsed - prev.elapsed;
+    const dz11 = (curr.z[11] || 0) - (prev.z[11] || 0);
+    intervals.push({
+      row: curr.row,
+      seconds: dt,
+      z11Rate: dt > 0 ? dz11 / dt : 0,
+      inflight: curr.inflight,
+    });
+  }
+  const { ctx, w, h } = setupCanvas(document.getElementById('cost-chart'));
+  const maxSeconds = niceMax(Math.max(...intervals.map((p) => p.seconds)));
+  const pad = drawAxes(ctx, w, h, 'Interval cost and throughput', 'seconds / 32 rows', maxSeconds);
+
+  ctx.fillStyle = '#69a7ff';
+  for (const p of intervals) {
+    const x = scaleX(p.row, pad, w);
+    const y = scaleY(p.seconds, pad, h, maxSeconds);
+    const base = h - pad.b;
+    ctx.globalAlpha = 0.72;
+    ctx.fillRect(x - 8, y, 16, base - y);
+  }
+  ctx.globalAlpha = 1;
+
+  const rateMax = Math.max(maxSeconds, niceMax(Math.max(...intervals.map((p) => p.z11Rate))));
+  for (const item of [
+    { key: 'z11Rate', color: '#ffb15c', width: 2 },
+    { key: 'inflight', color: '#72d67a', width: 1.7 },
+  ]) {
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = item.width;
+    ctx.beginPath();
+    intervals.forEach((p, i) => {
+      const x = scaleX(p.row, pad, w);
+      const y = scaleY(p[item.key], pad, h, rateMax);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+}
+
+function zoomSum(sample, zMin, zMax) {
+  let total = 0;
+  for (let z = zMin; z <= zMax; z++) total += sample.z[z] || 0;
+  return total;
+}
+
+function drawPhase() {
+  const phasePoints = samples.map((s) => ({
+    row: s.row,
+    bottom: s.z[11] || 0,
+    upper: zoomSum(s, 0, 10),
+  }));
+  const maxTiles = niceMax(Math.max(
+    ...phasePoints.map((p) => Math.max(p.bottom, p.upper))
+  ));
+  const ratioScale = maxTiles / 1.2;
+
+  lineChart(
+    document.getElementById('phase-chart'),
+    [
+      {
+        color: '#f25555',
+        points: phasePoints.map((p) => ({ row: p.row, value: p.bottom })),
+        width: 2.4,
+      },
+      {
+        color: '#69a7ff',
+        points: phasePoints.map((p) => ({ row: p.row, value: p.upper })),
+        width: 2.4,
+      },
+      {
+        color: '#72d67a',
+        points: phasePoints.map((p) => ({
+          row: p.row,
+          value: p.bottom > 0 ? (p.upper / p.bottom) * ratioScale : 0,
+        })),
+        width: 1.7,
+        dash: [5, 5],
+        noPoints: true,
+      },
+    ],
+    'Implicit second phase: upper pyramid tiles flushed during streaming',
+    'tiles written',
+    maxTiles
+  );
+}
+
+function drawPhaseBreakdown() {
+  const { ctx, w, h } = setupCanvas(document.getElementById('phase-breakdown-chart'));
+  const pad = drawAxes(
+    ctx,
+    w,
+    h,
+    'Old explicit phases vs current streaming run',
+    'seconds',
+    niceMax(completedZ11Seconds),
+    0,
+    0,
+    3
+  );
+  const base = h - pad.b;
+  const chartH = h - pad.t - pad.b;
+
+  function y(seconds) {
+    return base - seconds / niceMax(completedZ11Seconds) * chartH;
+  }
+
+  const barW = Math.min(90, (w - pad.l - pad.r) / 8);
+  const xOld = pad.l + (w - pad.l - pad.r) * 0.28;
+  const xNew = pad.l + (w - pad.l - pad.r) * 0.68;
+
+  let acc = 0;
+  for (const phase of oldZ8Phases) {
+    const y0 = y(acc + phase.seconds);
+    const y1 = y(acc);
+    ctx.fillStyle = phase.color;
+    ctx.globalAlpha = phase.color === '#ffb15c' ? 0.82 : 0.92;
+    ctx.fillRect(xOld - barW / 2, y0, barW, y1 - y0);
+    acc += phase.seconds;
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#b38cff';
+  ctx.globalAlpha = 0.88;
+  ctx.fillRect(xNew - barW / 2, y(completedZ11Seconds), barW, base - y(completedZ11Seconds));
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#f2f2f2';
+  ctx.font = '600 13px Segoe UI, sans-serif';
+  ctx.fillText('old z8: 140.8s', xOld - 45, base + 24);
+  ctx.fillText('current z11: 2196.3s', xNew - 60, base + 24);
+
+  ctx.fillStyle = '#a7abb6';
+  ctx.font = '12px Segoe UI, sans-serif';
+  ctx.fillText('57.7s render', xOld - 42, y(57.7 / 2) + 4);
+  ctx.fillText('83.1s encode/build', xOld - 54, y(57.7 + 83.1 / 2) + 4);
+  ctx.fillText('streaming includes encode/build', xNew - 78, y(completedZ11Seconds / 2) + 4);
+}
+
+function intervals() {
+  const out = [];
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1];
+    const curr = samples[i];
+    out.push({
+      row: curr.row,
+      seconds: curr.elapsed - prev.elapsed,
+      z11Delta: (curr.z[11] || 0) - (prev.z[11] || 0),
+    });
+  }
+  return out.filter((p) => p.seconds > 0);
+}
+
+function formatDuration(seconds) {
+  if (!isFinite(seconds) || seconds < 0) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h <= 0) return `${m}m`;
+  if (m === 60) return `${h + 1}h 0m`;
+  return `${h}h ${m}m`;
+}
+
+function interpolate(points, row, key) {
+  if (row <= points[0].row) return points[0][key];
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    if (row <= curr.row) {
+      const t = (row - prev.row) / (curr.row - prev.row);
+      return prev[key] + (curr[key] - prev[key]) * t;
+    }
+  }
+  return points.at(-1)[key];
+}
+
+function fitLogistic(points, minFactor, maxFactor) {
+  const clean = points.filter((p) => p.value > 0);
+  const maxY = Math.max(...clean.map((p) => p.value));
+  let best = null;
+
+  for (let step = 0; step <= 360; step++) {
+    const factor = minFactor + (maxFactor - minFactor) * step / 360;
+    const cap = maxY * factor;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0, n = 0;
+
+    for (const p of clean) {
+      if (p.value >= cap) continue;
+      const y = Math.log(p.value / (cap - p.value));
+      sx += p.row;
+      sy += y;
+      sxx += p.row * p.row;
+      sxy += p.row * y;
+      n++;
+    }
+    if (n < 3) continue;
+
+    const denom = n * sxx - sx * sx;
+    if (Math.abs(denom) < 1e-9) continue;
+    const b = (n * sxy - sx * sy) / denom;
+    const a = (sy - b * sx) / n;
+
+    let sse = 0;
+    for (const p of clean) {
+      const pred = cap / (1 + Math.exp(-(a + b * p.row)));
+      const rel = (pred - p.value) / Math.max(1, p.value);
+      sse += rel * rel;
+    }
+    if (!best || sse < best.sse) best = { cap, a, b, sse };
+  }
+
+  return {
+    ...best,
+    valueAt(row) {
+      return this.cap / (1 + Math.exp(-(this.a + this.b * row)));
+    },
+  };
+}
+
+const recent = intervals().slice(-4);
+const avgRecentSeconds = recent.reduce((sum, p) => sum + p.seconds, 0) / recent.length;
+const remainingIntervals = (2048 - latest.row) / 32;
+const localFinish = latest.elapsed + avgRecentSeconds * remainingIntervals;
+document.getElementById('local-eta').textContent = formatDuration(localFinish - latest.elapsed);
+
+const z8TilesAtLatest = interpolate(z8Reference, latest.row, 'tiles');
+const z8FractionAtLatest = z8TilesAtLatest / z8FinalTiles;
+const z8ScaledZ11Total = latest.z[11] / z8FractionAtLatest;
+document.getElementById('z8-progress').textContent = `${(z8FractionAtLatest * 100).toFixed(1)}%`;
+document.getElementById('z8-z11-total').textContent = Math.round(z8ScaledZ11Total).toLocaleString();
+
+const recentThroughputWindow = intervals().slice(-3);
+const recentZ11Delta = recentThroughputWindow.reduce((sum, p) => sum + p.z11Delta, 0);
+const recentSeconds = recentThroughputWindow.reduce((sum, p) => sum + p.seconds, 0);
+const recentZ11PerSecond = recentZ11Delta / recentSeconds;
+const curveFinish = latest.elapsed + (z8ScaledZ11Total - latest.z[11]) / recentZ11PerSecond;
+document.getElementById('curve-eta').textContent = formatDuration(curveFinish - latest.elapsed);
+
+function drawProjection() {
+  const observedElapsed = samples.map((s) => ({ row: s.row, value: s.elapsed }));
+  const projectedElapsed = [];
+  const projectedZ11Scaled = [];
+  const z8FractionScaled = [];
+  const scaleZ11ToSeconds = curveFinish / z8ScaledZ11Total;
+
+  for (let row = 32; row <= 2048; row += 32) {
+    const fraction = interpolate(z8Reference, row, 'tiles') / z8FinalTiles;
+    const projectedZ11 = fraction * z8ScaledZ11Total;
+    projectedZ11Scaled.push({ row, value: projectedZ11 * scaleZ11ToSeconds });
+    if (row >= latest.row) {
+      projectedElapsed.push({
+        row,
+        value: latest.elapsed + Math.max(0, projectedZ11 - latest.z[11]) / recentZ11PerSecond,
+      });
+    }
+  }
+  for (const p of z8Reference) {
+    z8FractionScaled.push({ row: p.row, value: p.tiles / z8FinalTiles * curveFinish });
+  }
+
+  lineChart(
+    document.getElementById('projection-chart'),
+    [
+      { color: '#f25555', points: observedElapsed, width: 2.5 },
+      { color: '#b38cff', points: projectedElapsed, width: 2, dash: [7, 5], noPoints: true },
+      { color: '#ffb15c', points: projectedZ11Scaled, width: 2, dash: [3, 5], noPoints: true },
+      { color: '#5fd0d5', points: z8FractionScaled, width: 2, dash: [1, 5], noPoints: true },
+    ],
+    `Projection to row 2048 (S-curve finish: ${formatDuration(curveFinish)})`,
+    'elapsed seconds',
+    niceMax(curveFinish),
+    0,
+    32,
+    2048
+  );
+}
+
+function redraw() {
+  lineChart(
+    document.getElementById('elapsed-chart'),
+    [{ color: '#f25555', points: samples.map((s) => ({ row: s.row, value: s.elapsed })) }],
+    'Elapsed time by streamed row',
+    'seconds',
+    niceMax(latest.elapsed)
+  );
+  drawTiles();
+  drawCost();
+  drawPhase();
+  drawProjection();
+  drawPhaseBreakdown();
+}
+
+const legend = document.getElementById('tiles-legend');
+for (let z = 5; z <= 11; z++) {
+  const item = document.createElement('span');
+  item.className = 'key';
+  item.style.color = colors[z];
+  item.innerHTML = `<span class="swatch"></span>z${z}`;
+  legend.appendChild(item);
+}
+
+window.addEventListener('resize', redraw);
+redraw();
+</script>
+</body>
+</html>
