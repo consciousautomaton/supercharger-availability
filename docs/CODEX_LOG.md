@@ -54,6 +54,23 @@ Skipped:
 Blocked:
 - Nothing expected.
 
+## 2026-05-07 — V2 data runbook
+
+What I did:
+- Added `v2/scripts/build_v2_data.py`, an orchestrator for the safe V2 data pipeline.
+- Added `docs/V2_RUNBOOK.md` with rebuild, validation, and frontend-check commands.
+- Smoke-tested the orchestrator with `--skip-ingests --skip-population`. It ran EV stock, station summary, country catalog, and validation successfully in 5.1s.
+
+Decisions:
+- Nobil is skipped by default because it requires a key or cached dump. It can be included with `--include-nobil`.
+- Population prototype is included by default because the current build is fast and bounded; it can be skipped with `--skip-population`.
+
+Skipped:
+- Did not run the full ingest+population orchestrator in this edit step because all individual steps were already run and validated during this session.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — UK NCR checked and skipped
 
 What I did:
