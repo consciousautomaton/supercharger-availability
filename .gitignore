@@ -8,13 +8,49 @@ __pycache__/
 data/*.tif
 data/*.csv
 data/*.json
+data/*.geojson
 data/*.npy
+data/*.npz
 data/*.bin
 data/*.xlsx
+data/*.osm.pbf
+data/*.osm.pbf.md5
+data/npy/
 
 # Computed outputs
 *.bin
 *.npy
 
+# V1 frontend generated outputs
+frontend/tiles/
+frontend/tiles_road/
+frontend/pop_cumulative.json
+frontend/pop_cumulative_road.json
+frontend/viewport_manifest.json
+frontend/viewport_manifest_road.json
+frontend/viewport_pop_total.bin
+frontend/viewport_pop_covered.bin
+frontend/country_stats.json
+frontend/country_stats_road.json
+frontend/countries.geojson
+frontend/chargers.json
+frontend/unassigned_chargers.csv
+frontend/unassigned_chargers.geojson
+frontend/unassigned_population_bins.csv
+frontend/unassigned_population_bins.geojson
+
 # Claude session data
 .claude/
+
+# Editor / IDE
+.vscode/
+
+# V2 frontend build artifacts
+v2/frontend/node_modules/
+v2/frontend/dist/
+
+# V2 large generated data (regenerable via v2/scripts/ingest_*.py)
+v2/frontend/public/data/chargers_bnetza.json
+
+# Archived experiments at repo root only (not scripts/archive)
+/archive/
