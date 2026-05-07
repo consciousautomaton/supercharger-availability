@@ -16,7 +16,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "useDefineForClassFields": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "@webgpu/types"]
   },
   "include": ["src/**/*"]
 }
