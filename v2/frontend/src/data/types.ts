@@ -92,3 +92,34 @@ export interface PopulationGridMeta {
   skipped_source_cells: number;
   notes: string[];
 }
+
+export interface CountryCatalogEntry {
+  iso_a3: string;
+  name: string;
+  name_short: string;
+  continent: string | null;
+  region_un: string | null;
+  subregion: string | null;
+  bbox: [number, number, number, number];
+  center: { lon: number; lat: number };
+  station_count: number;
+  dc_fast_count: number;
+  ultra_count: number;
+  has_station_data: boolean;
+  has_ev_stock_data: boolean;
+  ev_stock_year_min: number | null;
+  ev_stock_year_max: number | null;
+}
+
+export interface CountryCatalog {
+  meta: {
+    generated_at: string;
+    source: string;
+    country_count: number;
+    with_station_data: number;
+    with_ev_stock_data: number;
+    skipped_no_iso: number;
+    skipped_no_bbox: number;
+  };
+  countries: CountryCatalogEntry[];
+}

@@ -210,11 +210,52 @@ def validate_population_grid() -> int:
     return failures
 
 
+def validate_country_catalog() -> int:
+    path = DATA_DIR / "country_catalog.json"
+    if not path.exists():
+        print("Country catalog: missing optional country_catalog.json", file=sys.stderr)
+        return 0
+    data = load_json(path)
+    countries = data.get("countries") if isinstance(data, dict) else None
+    if not isinstance(countries, list):
+        print("Country catalog: ERROR missing countries array", file=sys.stderr)
+        return 1
+    failures = 0
+    seen: set[str] = set()
+    with_station = 0
+    with_ev = 0
+    for row in countries:
+        if not isinstance(row, dict):
+            failures += 1
+            continue
+        iso = row.get("iso_a3")
+        bbox = row.get("bbox")
+        if not isinstance(iso, str) or len(iso) != 3:
+            failures += 1
+        elif iso in seen:
+            failures += 1
+        else:
+            seen.add(iso)
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            failures += 1
+        if row.get("has_station_data"):
+            with_station += 1
+        if row.get("has_ev_stock_data"):
+            with_ev += 1
+    print(
+        f"Country catalog: countries={len(countries):,} with_station={with_station:,} "
+        f"with_ev_stock={with_ev:,} errors={failures:,}",
+        file=sys.stderr,
+    )
+    return failures
+
+
 def main() -> int:
     station_total, failures = validate_stations()
     failures += validate_ev_stock()
     failures += validate_station_summary(station_total)
     failures += validate_population_grid()
+    failures += validate_country_catalog()
     print(f"[done] station_total={station_total:,} failures={failures:,}", file=sys.stderr)
     return 1 if failures else 0
 

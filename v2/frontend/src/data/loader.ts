@@ -1,4 +1,10 @@
-import type { ChargerStation, EVStockCountryYear, PopulationGridMeta, StationSummary } from "./types";
+import type {
+  ChargerStation,
+  CountryCatalog,
+  EVStockCountryYear,
+  PopulationGridMeta,
+  StationSummary,
+} from "./types";
 
 interface LoadedSource {
   source: string;
@@ -85,6 +91,15 @@ export async function loadPopulationGridMeta(): Promise<PopulationGridMeta | nul
     return await fetchJson<PopulationGridMeta>("/data/pop_025deg_world_2030_meta.json");
   } catch (err) {
     console.warn("Skipping population grid metadata:", err);
+    return null;
+  }
+}
+
+export async function loadCountryCatalog(): Promise<CountryCatalog | null> {
+  try {
+    return await fetchJson<CountryCatalog>("/data/country_catalog.json");
+  } catch (err) {
+    console.warn("Skipping country catalog:", err);
     return null;
   }
 }

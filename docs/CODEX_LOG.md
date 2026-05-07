@@ -36,6 +36,24 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-07 — Country catalog script
+
+What I did:
+- Added `v2/scripts/build_country_catalog.py` to generate a compact country dropdown/catalog file from Natural Earth.
+- Added typed frontend loading for `country_catalog.json`.
+- Ran the build successfully. Output: 236 countries, 53 with station data, 28 with EV stock data, 89.1 KiB.
+- Extended the data validator to check country catalog shape and duplicate ISO codes.
+
+Decisions:
+- Catalog includes ISO-A3, display names, continent/region labels, bbox, center point, and whether generated station / EV stock data exists.
+- Bbox center is sufficient for first camera targeting; a later visual pass can improve fly-to framing.
+
+Skipped:
+- No country border rendering or dropdown UI wiring yet.
+
+Blocked:
+- Nothing expected.
+
 ## 2026-05-07 — UK NCR checked and skipped
 
 What I did:
