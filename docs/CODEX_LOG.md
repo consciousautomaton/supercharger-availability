@@ -54,6 +54,22 @@ Skipped:
 Blocked:
 - Nothing expected.
 
+## 2026-05-07 — Coverage prototype script
+
+What I did:
+- Added `v2/scripts/compute_coverage_prototype.py` for coarse covered-population sanity checks on the 0.25° grid.
+- Smoke-tested one scenario: `fast_only`, year 2026, radius 50 km. Runtime: 4.5s. Rough result: 586.4M / 8.48B people covered, 6.92%, using 53,320 fast stations. This is prototype-only and not final coverage math.
+
+Decisions:
+- This is explicitly not the final coverage engine. It uses 2030 coarse population for every year and computes great-circle distance to currently loaded station records.
+- It is intended to generate rough numbers for debugging station filters and timeline behavior before the WebGPU path exists.
+
+Skipped:
+- Did not run the full scenario matrix because it can be slower than the other data scripts and the output would be provisional.
+
+Blocked:
+- Nothing expected.
+
 ## 2026-05-07 — Country catalog script
 
 What I did:

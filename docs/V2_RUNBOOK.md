@@ -61,3 +61,12 @@ npm run build
 
 The build currently emits a chunk-size warning because Three.js / three-globe are large. That warning is expected until code splitting is added.
 
+## Coarse Coverage Prototype
+
+Run one bounded scenario:
+
+```powershell
+.venv/Scripts/python v2/scripts/compute_coverage_prototype.py --datasets fast_only --years 2026 --radii 50
+```
+
+This uses the 0.25° 2030 population prototype grid. It is only for sanity-checking filters and rough magnitudes before the WebGPU coverage engine exists.
