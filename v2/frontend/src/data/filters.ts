@@ -18,6 +18,8 @@ export function passesDatasetFilter(
   dataset: DatasetFilter,
 ): boolean {
   switch (dataset) {
+    case "ultra_fast":
+      return typeof station.power_kw === "number" && station.power_kw >= 150;
     case "fast_only":
       return station.kind === "fast";
     case "tesla_only":
@@ -46,6 +48,9 @@ export function stationMatchesState(
   station: ChargerStation,
   state: AppState,
 ): boolean {
+  if (state.region !== "world" && station.country !== state.region) {
+    return false;
+  }
   return (
     passesDatasetFilter(station, state.dataset) &&
     isVisibleForMode(station, state.mode, state.year)
@@ -58,4 +63,3 @@ export function filterStationsForState(
 ): ChargerStation[] {
   return stations.filter((station) => stationMatchesState(station, state));
 }
-

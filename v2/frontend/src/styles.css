@@ -108,6 +108,25 @@ body {
   margin: 0;
 }
 
+.stat-block h2 {
+  margin: 0 0 8px 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat-block p {
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.data-note {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 #controls-panel footer {
   margin-top: 32px;
   padding-top: 18px;

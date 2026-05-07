@@ -29,7 +29,11 @@ export interface ChargerStation {
 }
 
 export type Mode = "today" | "timeline";
-export type DatasetFilter = "fast_only" | "all_public" | "tesla_only";
+export type DatasetFilter =
+  | "fast_only"
+  | "ultra_fast"
+  | "all_public"
+  | "tesla_only";
 
 export interface AppState {
   region: string;

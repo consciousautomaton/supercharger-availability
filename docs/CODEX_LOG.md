@@ -70,6 +70,26 @@ Skipped:
 Blocked:
 - Nothing expected.
 
+## 2026-05-07 — UI data wiring
+
+What I did:
+- Wired generated V2 data into the current frontend panel without changing the core visual direction.
+- Region dropdown now populates from `country_catalog.json` and can filter visible charger points by country.
+- Added `ultra_fast` dataset support.
+- Reused shared station filtering logic for both stats and globe points.
+- Stats panel now shows selected scope, visible station count, source station counts, fast/ultra counts, EV stock where available, and top network breakdown.
+
+Decisions:
+- Normalized station country fields in-memory after loading the country catalog, so Tesla source country names can participate in ISO-A3 country filtering.
+- Kept UI scope conservative: no country fly-to, no country border rendering, no new globe layer. Those are visual tasks and should be handled separately.
+
+Skipped:
+- No WebGPU coverage overlay yet.
+- No single-network dropdown yet; the network catalog is ready for it, but it needs a more deliberate UI control.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — Country catalog script
 
 What I did:

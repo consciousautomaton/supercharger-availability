@@ -1,4 +1,4 @@
-import type { AppState, DatasetFilter, Mode } from "../data/types";
+import type { AppState, CountryCatalogEntry, DatasetFilter, Mode } from "../data/types";
 
 export interface ControlElements {
   region: HTMLSelectElement;
@@ -55,6 +55,30 @@ export function bindControls(
   });
 
   return { region, dataset, mode, yearControl, yearSlider, yearValue, distance };
+}
+
+export function populateRegionOptions(
+  controls: ControlElements,
+  countries: readonly CountryCatalogEntry[],
+): void {
+  const selected = controls.region.value;
+  const options = [
+    new Option("World", "world"),
+    ...countries
+      .filter((country) => country.has_station_data || country.has_ev_stock_data)
+      .map((country) => {
+        const labelParts = [country.name];
+        if (country.station_count > 0) {
+          labelParts.push(`${country.station_count.toLocaleString()} stations`);
+        }
+        return new Option(labelParts.join(" · "), country.iso_a3);
+      }),
+  ];
+  controls.region.replaceChildren(...options);
+  controls.region.disabled = false;
+  controls.region.value = options.some((option) => option.value === selected)
+    ? selected
+    : "world";
 }
 
 function require_<T extends HTMLElement>(id: string): T {
