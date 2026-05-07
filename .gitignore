@@ -52,5 +52,8 @@ v2/frontend/dist/
 # V2 large generated data (regenerable via v2/scripts/ingest_*.py)
 v2/frontend/public/data/chargers_bnetza.json
 
+# V2 ingest network caches
+v2/scripts/.*.json
+
 # Archived experiments at repo root only (not scripts/archive)
 /archive/

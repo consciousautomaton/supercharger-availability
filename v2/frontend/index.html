@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EV Charging Rollout</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="globe-container"></div>
+    <aside id="controls-panel">
+      <header>
+        <h1>EV Charging Rollout</h1>
+        <p class="subtitle">A tool for exploring how the world built public charging.</p>
+      </header>
+
+      <section class="control-group">
+        <label for="region-select">Region</label>
+        <select id="region-select" disabled>
+          <option value="world">World</option>
+        </select>
+      </section>
+
+      <section class="control-group">
+        <label for="dataset-select">Dataset</label>
+        <select id="dataset-select">
+          <option value="fast_only" selected>DC fast (≥ 50 kW)</option>
+          <option value="all_public">All public chargers</option>
+          <option value="tesla_only">Tesla only</option>
+        </select>
+      </section>
+
+      <section class="control-group">
+        <label for="mode-select">Mode</label>
+        <select id="mode-select">
+          <option value="today">Today</option>
+          <option value="timeline">Timeline</option>
+        </select>
+      </section>
+
+      <section class="control-group" id="year-control" hidden>
+        <label for="year-slider">Year <span id="year-value">2026</span></label>
+        <input type="range" id="year-slider" min="2012" max="2026" value="2026" step="1" />
+      </section>
+
+      <section class="control-group">
+        <label for="distance-select">Within</label>
+        <select id="distance-select" disabled>
+          <option value="5">5 km (local)</option>
+          <option value="50" selected>50 km (regional)</option>
+          <option value="250">250 km (road trip)</option>
+        </select>
+      </section>
+
+      <section id="stats-panel">
+        <p class="placeholder">Loading Tesla Supercharger data…</p>
+      </section>
+
+      <footer>
+        <p class="phase-marker">Phase 3 — Tesla (global) + Bundesnetzagentur (Germany). Distance/coverage not wired.</p>
+      </footer>
+    </aside>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
