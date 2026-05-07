@@ -119,7 +119,7 @@ Documented here so we don't drift back into them:
 Last updated: 2026-05-07.
 
 - [x] **Phase 0 — Cleanup.** Road code moved to `scripts/archive/road/`. `.gitignore` updated for `data/*.npz`, `data/*.osm.pbf`, `frontend/tiles_road/`, `frontend/*_road.json`, `frontend/tiles/`, `data/npy/`. V1 frontend untouched.
-- [~] **Phase 1 — Architecture skeleton.** Done: `v2/frontend/` Vite + TS + three-globe, OrbitControls, points layer, dropdown control panel, dark stats panel. **Pending: WebGPU compute pipeline (`src/compute/` is empty), Rust→WASM spatial indexing crate, multi-resolution 1 km / 100 m loading.** Currently rendering all stations as plain three-globe points.
+- [~] **Phase 1 — Architecture skeleton.** Done: `v2/frontend/` Vite + TS + three-globe, OrbitControls, points layer, dropdown control panel, light stats panel. **WebGPU compute pipeline landed**: `src/compute/coverageGPU.ts` runs per-cell coverage on a 1440×720 0.25° grid with 1° bucket pruning over a packed 24-byte charger storage buffer; verified vs CPU prototype within 0.07%. **Pending: Rust→WASM spatial indexing crate (deferred until 100 m regional streams need it), multi-resolution 1 km / 100 m loading, per-cell country mask for region-scoped coverage stats.**
 - [x] **Phase 2 — Tesla dataset.** `v2/scripts/ingest_supercharge.py` → `chargers_tesla.json` (8,962 stations, 2.9 MB). REAL_STATUSES filter, normalized to unified schema.
 - [~] **Phase 3 — National authoritative sources.**
   - [x] Bundesnetzagentur (Germany): `ingest_bnetza.py` → `chargers_bnetza.json` (105,381 stations, 36 MB). Tesla rows dropped to dedup against supercharge.info.

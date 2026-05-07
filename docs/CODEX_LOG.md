@@ -320,3 +320,54 @@ Skipped:
 
 Blocked:
 - Nothing.
+
+## 2026-05-07 — WebGPU coverage pipeline (Claude shift)
+
+What I did:
+- Added `src/compute/coverageGPU.ts`. Real WebGPU compute path replacing the
+  CPU prototype's per-cell loop. WGSL compute shader (workgroup_size 64)
+  iterates one thread per pop cell on the 1440x720 0.25° grid. Pruning by
+  a 1° lat/lon bucket grid (360x180) over a sorted charger storage buffer.
+  Bucket walk is lat-aware on the lon axis (cosLat) and constant on lat.
+- Charger struct packed at 24 bytes: lat, lon, open_year, close_year,
+  network FNV-1a hash, flags bitfield (open_today / fast / ultra / tesla
+  / open_to_others). Filters mirror CPU semantics.
+- Output: per-cell `covered_mask` u32 buffer kept on GPU for the visual
+  layer in a future commit, plus atomic u32 totals (covered_pop, total_pop)
+  read back via mapAsync.
+- Installed `@webgpu/types` and added it to `tsconfig.json` `types` so the
+  module typechecks under strict mode.
+- Console smoke test: `window.coverageSmokeTest({...})` runs both the GPU
+  pipeline and the CPU prototype on the same state and logs absolute
+  totals + fraction + diff.
+- Wired the coverage stat into the right panel for `region == "world"`.
+  The world block now leads with "X% of world population within Y km of
+  a charger" plus covered/total in millions and dispatch latency. State
+  changes (year, mode, dataset, distance, network) re-dispatch with a
+  sequence guard so a fast slider drag discards stale results.
+
+Decisions:
+- Atomic `u32` overflowed at the world-pop scale (~8.48B > 4.29B). Fixed
+  by scaling pop to kilopeople before `atomicAdd` and multiplying back on
+  read-back. ~0.07% global error vs CPU prototype on the verified
+  scenario (fast_only / today / 2026 / 50 km / world: GPU 31.10% in
+  463 ms vs CPU 31.03% in 3,176 ms — ~7x faster).
+- Dropped the original `src/compute/webgpu.ts` support-check stub from
+  the active path; `coverageGPU.ts` does its own adapter/device request.
+  The stub stays in place for now in case other code uses it.
+- Region != "world" coverage is intentionally not yet computed. Per-cell
+  country mask is a separate data-pipeline task. Panel shows a one-line
+  "coming after country masking lands" placeholder when a country is
+  selected.
+- Did NOT start the Rust/WASM spatial index. Brute-force-with-bucket-pruning
+  is fast enough at the current grid; revisit when 100 m streamed regional
+  tiles arrive.
+
+Skipped:
+- No globe-side rendering of `covered_mask`. That's the next visual pass
+  (paint covered cells onto the globe surface).
+- No 2010/2015/2020/2025 GHS-POP epochs yet — only 2030 wired into the
+  GPU path.
+
+Blocked:
+- Nothing.
