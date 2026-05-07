@@ -30,6 +30,7 @@ export async function loadAllStations(): Promise<ChargerStation[]> {
     { source: "bnetza", url: "/data/chargers_bnetza.json", required: true },
     { source: "irve", url: "/data/chargers_irve.json", required: false },
     { source: "nobil", url: "/data/chargers_nobil.json", required: false },
+    { source: "afdc", url: "/data/chargers_afdc.json", required: false },
   ];
   const loaded = await Promise.all(
     sourceSpecs.map(async (spec): Promise<LoadedSource | null> => {

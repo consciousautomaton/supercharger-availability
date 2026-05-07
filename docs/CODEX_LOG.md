@@ -52,3 +52,22 @@ Skipped:
 
 Blocked:
 - Nobil datadump requires an API key or cached JSON file.
+
+## 2026-05-07 — AFDC ingest
+
+What I did:
+- Added `v2/scripts/ingest_afdc.py` for the AFDC/NLR Alternative Fuel Stations API.
+- Wired `chargers_afdc.json` into the frontend loader as an optional source.
+- Ran the ingest successfully. Output: 86,137 station records from 94,801 raw API records. Dropped 8,664 Tesla rows. Fast / slow / unknown: 14,374 / 71,762 / 1. Missing open date: 3.
+
+Decisions:
+- Used the current `developer.nlr.gov` host because NREL developer docs now redirect there and warn that the old `developer.nrel.gov` domain is being retired.
+- Requested public, available electric stations in both US and Canada with `limit=all`.
+- Dropped Tesla networks for dedup against supercharge.info.
+- AFDC does not expose reliable station-level DC power in this endpoint, so DC fast stations are conservatively assigned `power_kw = 50` and AC stations use coarse Level 1 / Level 2 defaults.
+
+Skipped:
+- No attempt to infer higher DC power from network names or external listings. This keeps the source deterministic and avoids false precision.
+
+Blocked:
+- Nothing.

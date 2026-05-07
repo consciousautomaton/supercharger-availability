@@ -125,7 +125,7 @@ Last updated: 2026-05-07.
   - [x] Bundesnetzagentur (Germany): `ingest_bnetza.py` → `chargers_bnetza.json` (105,381 stations, 36 MB). Tesla rows dropped to dedup against supercharge.info.
   - [x] IRVE (France): `ingest_irve.py` → `chargers_irve.json` (63,217 stations, 21.9 MB). Tesla rows dropped to dedup against supercharge.info.
   - [~] Nobil (Norway) — script added; blocked until API key or cached datadump is available.
-  - [ ] AFDC (US/Canada) — NREL public-domain feed, `open_date`.
+  - [x] AFDC (US/Canada): `ingest_afdc.py` → `chargers_afdc.json` (86,137 stations, 34.6 MB). Tesla rows dropped to dedup against supercharge.info.
   - [ ] UK NCR archive — request-access; not blocking.
   - Frontend pipeline is source-agnostic: each new ingest auto-merges via `loadAllStations()` once added to the loader.
 - [ ] Phase 4 — OCM "Today" spine
