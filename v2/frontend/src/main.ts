@@ -272,3 +272,62 @@ function syncControlsFromState(state: AppState): void {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+// Console smoke-test: window.coverageSmokeTest() runs the WebGPU pipeline and
+// the CPU prototype against the same state and logs both results so we can
+// verify GPU output matches CPU semantics before wiring it into the UI.
+declare global {
+  interface Window {
+    coverageSmokeTest: (
+      stateOverride?: Partial<AppState>,
+    ) => Promise<void>;
+  }
+}
+
+window.coverageSmokeTest = async (stateOverride = {}) => {
+  const { loadPopulationGrid2030 } = await import("./compute/populationGrid");
+  const { createCoverageGPU } = await import("./compute/coverageGPU");
+  const { computeCoveragePrototype } = await import(
+    "./compute/coveragePrototype"
+  );
+  if (allStations.length === 0) {
+    console.warn("[smoketest] stations not loaded yet");
+    return;
+  }
+  const state: AppState = { ...currentState, ...stateOverride };
+  console.info("[smoketest] state", JSON.stringify(state));
+  const filtered = filterStationsForState(allStations, state);
+  console.info(
+    `[smoketest] CPU-filter station count = ${filtered.length} / ${allStations.length}`,
+  );
+  const t0 = performance.now();
+  const population = await loadPopulationGrid2030();
+  const t1 = performance.now();
+  console.info(
+    `[smoketest] pop grid loaded (${population.values.length} cells, ${(t1 - t0).toFixed(0)}ms)`,
+  );
+  const pipeline = await createCoverageGPU(population, allStations);
+  const gpu = await pipeline.dispatch(state);
+  console.info(
+    `[smoketest] gpu coveredPop=${gpu.coveredPop} totalPop=${gpu.totalPop} ` +
+      `fraction=${(gpu.fractionCovered * 100).toFixed(4)}% ` +
+      `stations=${gpu.stationCount} dispatch=${gpu.dispatchMs.toFixed(1)}ms`,
+  );
+  const tCPU = performance.now();
+  const cpu = computeCoveragePrototype(population, allStations, state);
+  const cpuMs = performance.now() - tCPU;
+  const cpuFraction =
+    cpu.totalPopulation > 0 ? cpu.coveredPopulation / cpu.totalPopulation : 0;
+  console.info(
+    `[smoketest] cpu coveredPop=${cpu.coveredPopulation.toFixed(0)} ` +
+      `totalPop=${cpu.totalPopulation.toFixed(0)} ` +
+      `fraction=${(cpuFraction * 100).toFixed(4)}% ` +
+      `coveredCells=${cpu.coveredCells}/${cpu.totalNonzeroCells} ` +
+      `stations=${cpu.stationCount} (${cpuMs.toFixed(0)}ms)`,
+  );
+  const diff = Math.abs(gpu.fractionCovered - cpuFraction);
+  console.info(
+    `[smoketest] |gpu - cpu| = ${(diff * 100).toFixed(4)}%`,
+  );
+  pipeline.destroy();
+};

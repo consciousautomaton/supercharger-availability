@@ -212,7 +212,10 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
   let p = pop[idx];
   if (p <= 0.0) { return; }
 
-  let q = u32(p);
+  // Scale to kilopeople. Total world pop ~8.48B exceeds u32 max (4.29B) at
+  // person granularity; thousands keeps the global sum well under u32 limits
+  // while preserving sub-percent accuracy at the 0.25 deg cell scale.
+  let q = u32(p * 0.001);
   atomicAdd(&totals[1], q);
 
   let x = idx % params.width;
@@ -420,8 +423,9 @@ export async function createCoverageGPU(
     await totalsReadback.mapAsync(GPUMapMode.READ);
     const view = new Uint32Array(totalsReadback.getMappedRange().slice(0));
     totalsReadback.unmap();
-    const coveredPop = view[0];
-    const totalPop = view[1];
+    // Shader accumulates kilopeople; multiply back to absolute people.
+    const coveredPop = view[0] * 1000;
+    const totalPop = view[1] * 1000;
     const fractionCovered = totalPop > 0 ? coveredPop / totalPop : 0;
 
     return {
