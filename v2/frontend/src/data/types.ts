@@ -33,7 +33,8 @@ export type DatasetFilter =
   | "fast_only"
   | "ultra_fast"
   | "all_public"
-  | "tesla_only";
+  | "tesla_only"
+  | "single_network";
 
 export interface AppState {
   region: string;
@@ -41,6 +42,7 @@ export interface AppState {
   mode: Mode;
   year: number;
   distance_km: number;
+  network_id: string | null;
 }
 
 export interface EVStockYear {

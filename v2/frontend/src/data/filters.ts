@@ -1,4 +1,5 @@
 import type { AppState, ChargerStation, DatasetFilter, Mode } from "./types";
+import { canonicalNetworkId } from "./networks";
 
 export function openYear(station: ChargerStation): number | null {
   if (!station.open_date) return null;
@@ -24,6 +25,8 @@ export function passesDatasetFilter(
       return station.kind === "fast";
     case "tesla_only":
       return station.network === "Tesla";
+    case "single_network":
+      return true;
     case "all_public":
       return true;
   }
@@ -53,6 +56,9 @@ export function stationMatchesState(
   }
   return (
     passesDatasetFilter(station, state.dataset) &&
+    (state.dataset !== "single_network" ||
+      (state.network_id != null &&
+        canonicalNetworkId(station.network) === state.network_id)) &&
     isVisibleForMode(station, state.mode, state.year)
   );
 }

@@ -1,10 +1,15 @@
 import { createGlobe } from "./globe/setup";
 import { attachPoints } from "./globe/points";
-import { bindControls, populateRegionOptions } from "./ui/controls";
+import {
+  bindControls,
+  populateNetworkOptions,
+  populateRegionOptions,
+} from "./ui/controls";
 import {
   loadAllStations,
   loadCountryCatalog,
   loadEVStockCountryYear,
+  loadNetworkCatalog,
   loadStationSummary,
 } from "./data/loader";
 import { filterStationsForState } from "./data/filters";
@@ -23,6 +28,7 @@ const initialState: AppState = {
   mode: "today",
   year: 2026,
   distance_km: 50,
+  network_id: null,
 };
 
 const container = document.getElementById("globe-container");
@@ -123,14 +129,21 @@ Promise.all([
   loadCountryCatalog(),
   loadStationSummary(),
   loadEVStockCountryYear(),
+  loadNetworkCatalog(),
 ])
-  .then(([stations, countries, summary, ev]) => {
+  .then(([stations, countries, summary, ev, networks]) => {
     countryCatalog = countries;
     stationSummary = summary;
     evStock = ev;
     if (countryCatalog) {
       normalizeStationCountries(stations, countryCatalog);
       populateRegionOptions(controls, countryCatalog.countries);
+    }
+    if (networks) {
+      populateNetworkOptions(controls, networks.networks);
+      if (currentState.network_id == null && controls.network.value) {
+        currentState = { ...currentState, network_id: controls.network.value };
+      }
     }
     allStations = stations;
     totalCount = stations.length;

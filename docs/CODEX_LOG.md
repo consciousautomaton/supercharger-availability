@@ -90,6 +90,23 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-07 — Single-network filter
+
+What I did:
+- Added a `single_network` dataset filter and network dropdown.
+- Added shared frontend canonical-network mapping for station filtering.
+- Populated the dropdown from `network_catalog.json`, limiting visible choices to canonical non-raw networks.
+
+Decisions:
+- Kept raw long-tail operators out of the dropdown for now. They remain in `network_catalog.json` and can be exposed through search later.
+- The single-network filter applies after country/year/mode filters, matching the rest of the app state model.
+
+Skipped:
+- No network logos or branded styling.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — Country catalog script
 
 What I did:

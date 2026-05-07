@@ -8,6 +8,8 @@ export interface ControlElements {
   yearSlider: HTMLInputElement;
   yearValue: HTMLElement;
   distance: HTMLSelectElement;
+  networkControl: HTMLElement;
+  network: HTMLSelectElement;
 }
 
 export function bindControls(
@@ -21,11 +23,17 @@ export function bindControls(
   const yearSlider = require_<HTMLInputElement>("year-slider");
   const yearValue = require_<HTMLElement>("year-value");
   const distance = require_<HTMLSelectElement>("distance-select");
+  const networkControl = require_<HTMLElement>("network-control");
+  const network = require_<HTMLSelectElement>("network-select");
 
   function syncYearControl(currentMode: Mode): void {
     yearControl.hidden = currentMode !== "timeline";
   }
+  function syncNetworkControl(currentDataset: DatasetFilter): void {
+    networkControl.hidden = currentDataset !== "single_network";
+  }
   syncYearControl(state.mode);
+  syncNetworkControl(state.dataset);
 
   mode.addEventListener("change", () => {
     const next: AppState = { ...state, mode: mode.value as Mode };
@@ -47,6 +55,11 @@ export function bindControls(
   });
   dataset.addEventListener("change", () => {
     state = { ...state, dataset: dataset.value as DatasetFilter };
+    syncNetworkControl(state.dataset);
+    onChange(state);
+  });
+  network.addEventListener("change", () => {
+    state = { ...state, network_id: network.value || null };
     onChange(state);
   });
   distance.addEventListener("change", () => {
@@ -54,7 +67,17 @@ export function bindControls(
     onChange(state);
   });
 
-  return { region, dataset, mode, yearControl, yearSlider, yearValue, distance };
+  return {
+    region,
+    dataset,
+    mode,
+    yearControl,
+    yearSlider,
+    yearValue,
+    distance,
+    networkControl,
+    network,
+  };
 }
 
 export function populateRegionOptions(
@@ -79,6 +102,26 @@ export function populateRegionOptions(
   controls.region.value = options.some((option) => option.value === selected)
     ? selected
     : "world";
+}
+
+export function populateNetworkOptions(
+  controls: ControlElements,
+  networks: readonly { id: string; label: string; station_count: number }[],
+): void {
+  const topNetworks = networks
+    .filter((network) => !network.id.startsWith("raw:"))
+    .slice(0, 40);
+  const options = topNetworks.map(
+    (network) =>
+      new Option(
+        `${network.label} · ${network.station_count.toLocaleString()} stations`,
+        network.id,
+      ),
+  );
+  controls.network.replaceChildren(...options);
+  if (!controls.network.value && options[0]) {
+    controls.network.value = options[0].value;
+  }
 }
 
 function require_<T extends HTMLElement>(id: string): T {
