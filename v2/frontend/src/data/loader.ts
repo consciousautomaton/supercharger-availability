@@ -1,4 +1,4 @@
-import type { ChargerStation, EVStockCountryYear } from "./types";
+import type { ChargerStation, EVStockCountryYear, StationSummary } from "./types";
 
 interface LoadedSource {
   source: string;
@@ -67,6 +67,15 @@ export async function loadEVStockCountryYear(): Promise<EVStockCountryYear | nul
     return await fetchJson<EVStockCountryYear>("/data/ev_stock_country_year.json");
   } catch (err) {
     console.warn("Skipping EV stock data:", err);
+    return null;
+  }
+}
+
+export async function loadStationSummary(): Promise<StationSummary | null> {
+  try {
+    return await fetchJson<StationSummary>("/data/station_summary.json");
+  } catch (err) {
+    console.warn("Skipping station summary:", err);
     return null;
   }
 }

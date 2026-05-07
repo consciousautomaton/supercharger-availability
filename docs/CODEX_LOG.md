@@ -88,6 +88,24 @@ Skipped:
 Blocked:
 - BEV/PHEV stock split requires either direct IEA workbook access or a separate data source.
 
+## 2026-05-07 — Station summary script
+
+What I did:
+- Added `v2/scripts/build_station_summary.py` to summarize loaded station datasets by country, network, power tier, and open year.
+- Added TypeScript types and `loadStationSummary()` for later UI consumption.
+- Ran the summary successfully. Output: 263,697 stations summarized from Tesla, BNetzA, IRVE, and AFDC. Countries: 55. Network labels: 11,786. Unmapped country records: 0. Output size: 5.7 MiB.
+
+Decisions:
+- This script summarizes station records, not connector counts or population coverage.
+- It normalizes source country fields to ISO-A3 using Natural Earth names plus manual aliases for common charger-source country labels.
+- It preserves long-tail network names instead of collapsing them prematurely; UI can decide how to group "Other" later.
+
+Skipped:
+- Did not wire the summary into visible UI yet because that would be a visual/layout task and should be isolated later.
+
+Blocked:
+- Nothing expected.
+
 ## 2026-05-07 — Nobil ingest scaffold
 
 What I did:

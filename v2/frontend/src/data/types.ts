@@ -46,3 +46,30 @@ export interface EVStockYear {
 }
 
 export type EVStockCountryYear = Record<string, Record<string, EVStockYear>>;
+
+export interface StationSummaryNetwork {
+  station_count: number;
+  slow_count: number;
+  dc_fast_count: number;
+  ultra_count: number;
+  unknown_power_count: number;
+  with_open_date: number;
+  opened_by_year: Record<string, number>;
+}
+
+export interface StationSummaryBucket extends StationSummaryNetwork {
+  networks: Record<string, StationSummaryNetwork>;
+}
+
+export interface StationSummary {
+  meta: {
+    generated_at: string;
+    sources: Record<string, number>;
+    station_count: number;
+    unmapped_country_values: Record<string, number>;
+    notes: string[];
+  };
+  global: StationSummaryBucket;
+  countries: Record<string, StationSummaryBucket>;
+  networks: Record<string, StationSummaryNetwork>;
+}
