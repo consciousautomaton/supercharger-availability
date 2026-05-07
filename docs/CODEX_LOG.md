@@ -70,6 +70,24 @@ What should happen next:
 - Decide whether to continue with Phase 5 via IEA/OWID EV stock and GHS-POP epoch scaffolding, or first wire the expanded station sources into UI filters and network summaries.
 - If Nobil matters for the next demo, get an API key or raw datadump and rerun `v2/scripts/ingest_nobil.py`.
 
+## 2026-05-07 — EV stock ingest script
+
+What I did:
+- Added `v2/scripts/ingest_iea_ev_stock.py` for country/year electric car stock.
+- Ran the ingest successfully. Output: 376 country-year rows, 30 countries, 2010-2024. Latest-year total: 56,907,780 electric cars across 30 countries in 2024.
+- Added typed frontend loading via `loadEVStockCountryYear()`.
+
+Decisions:
+- Used Our World in Data's open CSV derived from IEA Global EV Outlook 2025 because the official IEA XLSX is listed as free but direct download is login-gated.
+- Output keeps the planned `{bev, phev, total}` shape, but sets `bev` and `phev` to null because the OWID chart exposes total electric car stock only.
+- Wrote a companion metadata JSON so the frontend can cite the data honestly later.
+
+Skipped:
+- Did not attempt browser-authenticated IEA XLSX download.
+
+Blocked:
+- BEV/PHEV stock split requires either direct IEA workbook access or a separate data source.
+
 ## 2026-05-07 — Nobil ingest scaffold
 
 What I did:

@@ -38,3 +38,11 @@ export interface AppState {
   year: number;
   distance_km: number;
 }
+
+export interface EVStockYear {
+  bev: number | null;
+  phev: number | null;
+  total: number | null;
+}
+
+export type EVStockCountryYear = Record<string, Record<string, EVStockYear>>;

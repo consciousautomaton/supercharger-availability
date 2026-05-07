@@ -99,7 +99,7 @@ Documented here so we don't drift back into them:
 - Used only when `Mode=Today` and no authoritative source covers the region.
 
 **Phase 5 — EV adoption + year-matched population**
-- IEA Global EV Data Explorer ingest (country-year EV stock).
+- IEA/OWID Global EV Data Explorer ingest (country-year EV stock).
 - GHS-POP year-matched epochs, linear interpolation between 5-year anchors.
 - Combined surface stats: chargers per million people + EVs per million people, both temporal.
 
@@ -129,7 +129,7 @@ Last updated: 2026-05-07.
   - [~] UK NCR archive — decommissioned; archived data available only on request, so skipped for this shift.
   - Frontend pipeline is source-agnostic: each new ingest auto-merges via `loadAllStations()` once added to the loader.
 - [ ] Phase 4 — OCM "Today" spine
-- [ ] Phase 5 — EV adoption + year-matched population
+- [~] **Phase 5 — EV adoption + year-matched population.** Done: `ingest_iea_ev_stock.py` → `ev_stock_country_year.json` (30 countries, 2010-2024, total stock only via OWID/IEA). Pending: BEV/PHEV split, GHS-POP 2010/2015/2020/2025/2030 epoch processing, country population by year.
 - [ ] Phase 6 — Stats and polish
 - [ ] Phase 7 — Hosting
 

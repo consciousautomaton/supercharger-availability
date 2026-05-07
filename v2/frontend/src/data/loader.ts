@@ -1,4 +1,4 @@
-import type { ChargerStation } from "./types";
+import type { ChargerStation, EVStockCountryYear } from "./types";
 
 interface LoadedSource {
   source: string;
@@ -60,4 +60,13 @@ export function openYear(s: ChargerStation): number | null {
   if (!s.open_date) return null;
   const y = Number.parseInt(s.open_date.slice(0, 4), 10);
   return Number.isFinite(y) ? y : null;
+}
+
+export async function loadEVStockCountryYear(): Promise<EVStockCountryYear | null> {
+  try {
+    return await fetchJson<EVStockCountryYear>("/data/ev_stock_country_year.json");
+  } catch (err) {
+    console.warn("Skipping EV stock data:", err);
+    return null;
+  }
 }
