@@ -51,6 +51,25 @@ Skipped:
 Blocked:
 - Archived NCR data requires a manual request.
 
+## 2026-05-07 — End of shift
+
+What is working end-to-end:
+- V2 handoff docs are in place.
+- Tesla, BNetzA, IRVE, and AFDC are represented in the frontend loader.
+- IRVE output exists locally: 63,217 France stations.
+- AFDC output exists locally: 86,137 US/Canada stations.
+- Frontend typecheck and build pass after adding the optional sources.
+
+Known broken / incomplete:
+- Nobil is scaffolded but has no output until the user provides `NOBIL_API_KEY`, `data/nobil_api_key.txt`, or `data/nobil_datadump.json`.
+- UK NCR has no ingest because archive access requires a manual request.
+- Existing visual/frontend files (`v2/frontend/src/globe/setup.ts`, `v2/frontend/src/main.ts`, `v2/frontend/src/styles.css`) were dirty before this shift and were intentionally not touched.
+- WebGPU compute, population layers, EV adoption ingest, and the V2 analytical UI wiring are still pending.
+
+What should happen next:
+- Decide whether to continue with Phase 5 via IEA/OWID EV stock and GHS-POP epoch scaffolding, or first wire the expanded station sources into UI filters and network summaries.
+- If Nobil matters for the next demo, get an API key or raw datadump and rerun `v2/scripts/ingest_nobil.py`.
+
 ## 2026-05-07 — Nobil ingest scaffold
 
 What I did:
