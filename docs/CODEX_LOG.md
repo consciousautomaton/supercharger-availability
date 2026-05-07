@@ -107,6 +107,22 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-07 — URL state
+
+What I did:
+- Added URL hash persistence for `region`, `dataset`, `mode`, `year`, `distance`, and `network`.
+- Added hash parsing on initial load and hashchange sync back into the controls.
+
+Decisions:
+- Used `history.replaceState` for control changes so dragging/selecting does not spam browser history.
+- Kept only non-default state in the URL to keep links short.
+
+Skipped:
+- No share button yet.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — Country catalog script
 
 What I did:

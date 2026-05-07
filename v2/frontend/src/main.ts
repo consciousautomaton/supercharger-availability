@@ -22,7 +22,7 @@ import type {
   StationSummary,
 } from "./data/types";
 
-const initialState: AppState = {
+const defaultState: AppState = {
   region: "world",
   dataset: "fast_only",
   mode: "today",
@@ -37,7 +37,7 @@ if (!container) throw new Error("#globe-container missing");
 const { globe } = createGlobe(container);
 const statsEl = document.querySelector<HTMLElement>("#stats-panel");
 
-let currentState: AppState = { ...initialState };
+let currentState: AppState = readStateFromHash(defaultState);
 let updatePoints: ((state: AppState) => number) | null = null;
 let allStations: ChargerStation[] = [];
 let totalCount = 0;
@@ -45,6 +45,7 @@ let countryCatalog: CountryCatalog | null = null;
 let stationSummary: StationSummary | null = null;
 let evStock: EVStockCountryYear | null = null;
 const controls = bindControls(currentState, applyState);
+syncControlsFromState(currentState);
 
 function fmtNumber(n: number): string {
   return n.toLocaleString();
@@ -118,6 +119,7 @@ function escapeHtml(s: string): string {
 
 function applyState(state: AppState): void {
   currentState = state;
+  writeStateToHash(state);
   if (updatePoints) {
     const visible = updatePoints(state);
     renderStats(state, visible);
@@ -159,6 +161,12 @@ Promise.all([
   });
 
 console.info("[v2] phase 3 mounted");
+
+window.addEventListener("hashchange", () => {
+  const next = readStateFromHash(currentState);
+  syncControlsFromState(next);
+  applyState(next);
+});
 
 function getSelectedCountry(region: string): CountryCatalogEntry | null {
   if (!countryCatalog || region === "world") return null;
@@ -204,4 +212,63 @@ function normalizeStationCountries(
     const iso = byName.get(raw.toLowerCase());
     if (iso) station.country = iso;
   }
+}
+
+function readStateFromHash(base: AppState): AppState {
+  const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const dataset = params.get("dataset") as AppState["dataset"] | null;
+  const mode = params.get("mode") as AppState["mode"] | null;
+  const year = Number.parseInt(params.get("year") ?? "", 10);
+  const distance = Number.parseInt(params.get("distance") ?? "", 10);
+  return {
+    region: params.get("region") || base.region,
+    dataset:
+      dataset &&
+      ["fast_only", "ultra_fast", "all_public", "tesla_only", "single_network"].includes(
+        dataset,
+      )
+        ? dataset
+        : base.dataset,
+    mode: mode && ["today", "timeline"].includes(mode) ? mode : base.mode,
+    year: Number.isFinite(year) ? clamp(year, 2012, 2026) : base.year,
+    distance_km: Number.isFinite(distance) ? distance : base.distance_km,
+    network_id: params.get("network") || base.network_id,
+  };
+}
+
+function writeStateToHash(state: AppState): void {
+  const params = new URLSearchParams();
+  if (state.region !== defaultState.region) params.set("region", state.region);
+  if (state.dataset !== defaultState.dataset) params.set("dataset", state.dataset);
+  if (state.mode !== defaultState.mode) params.set("mode", state.mode);
+  if (state.year !== defaultState.year) params.set("year", String(state.year));
+  if (state.distance_km !== defaultState.distance_km) {
+    params.set("distance", String(state.distance_km));
+  }
+  if (state.network_id) params.set("network", state.network_id);
+  const nextHash = params.toString();
+  const currentHash = location.hash.replace(/^#/, "");
+  if (nextHash !== currentHash) {
+    history.replaceState(
+      null,
+      "",
+      nextHash ? `#${nextHash}` : `${location.pathname}${location.search}`,
+    );
+  }
+}
+
+function syncControlsFromState(state: AppState): void {
+  controls.region.value = state.region;
+  controls.dataset.value = state.dataset;
+  controls.mode.value = state.mode;
+  controls.yearSlider.value = String(state.year);
+  controls.yearValue.textContent = String(state.year);
+  controls.distance.value = String(state.distance_km);
+  if (state.network_id) controls.network.value = state.network_id;
+  controls.yearControl.hidden = state.mode !== "timeline";
+  controls.networkControl.hidden = state.dataset !== "single_network";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
