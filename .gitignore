@@ -51,6 +51,9 @@ v2/frontend/dist/
 
 # V2 large generated data (regenerable via v2/scripts/ingest_*.py)
 v2/frontend/public/data/chargers_bnetza.json
+v2/frontend/public/data/chargers_irve.json
+v2/frontend/public/data/chargers_nobil.json
+v2/frontend/public/data/chargers_afdc.json
 
 # V2 ingest network caches
 v2/scripts/.*.json

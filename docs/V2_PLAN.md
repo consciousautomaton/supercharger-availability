@@ -123,7 +123,7 @@ Last updated: 2026-05-07.
 - [x] **Phase 2 — Tesla dataset.** `v2/scripts/ingest_supercharge.py` → `chargers_tesla.json` (8,962 stations, 2.9 MB). REAL_STATUSES filter, normalized to unified schema.
 - [~] **Phase 3 — National authoritative sources.**
   - [x] Bundesnetzagentur (Germany): `ingest_bnetza.py` → `chargers_bnetza.json` (105,381 stations, 36 MB). Tesla rows dropped to dedup against supercharge.info.
-  - [ ] IRVE (France) — `transport.data.gouv.fr`, `date_mise_en_service` → `open_date`.
+  - [x] IRVE (France): `ingest_irve.py` → `chargers_irve.json` (63,217 stations, 21.9 MB). Tesla rows dropped to dedup against supercharge.info.
   - [ ] Nobil (Norway) — Enova feed, `Created` → `open_date`.
   - [ ] AFDC (US/Canada) — NREL public-domain feed, `open_date`.
   - [ ] UK NCR archive — request-access; not blocking.

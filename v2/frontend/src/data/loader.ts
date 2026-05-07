@@ -5,6 +5,12 @@ interface LoadedSource {
   stations: ChargerStation[];
 }
 
+interface SourceSpec {
+  source: string;
+  url: string;
+  required: boolean;
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`Failed to load ${url}: ${resp.status}`);
@@ -19,19 +25,27 @@ function inferKind(s: ChargerStation): ChargerStation["kind"] {
 }
 
 export async function loadAllStations(): Promise<ChargerStation[]> {
-  const sources: Array<Promise<LoadedSource>> = [
-    fetchJson<ChargerStation[]>("/data/chargers_tesla.json").then((stations) => ({
-      source: "tesla",
-      stations,
-    })),
-    fetchJson<ChargerStation[]>("/data/chargers_bnetza.json").then((stations) => ({
-      source: "bnetza",
-      stations,
-    })),
+  const sourceSpecs: SourceSpec[] = [
+    { source: "tesla", url: "/data/chargers_tesla.json", required: true },
+    { source: "bnetza", url: "/data/chargers_bnetza.json", required: true },
+    { source: "irve", url: "/data/chargers_irve.json", required: false },
   ];
-  const loaded = await Promise.all(sources);
+  const loaded = await Promise.all(
+    sourceSpecs.map(async (spec): Promise<LoadedSource | null> => {
+      try {
+        const stations = await fetchJson<ChargerStation[]>(spec.url);
+        return { source: spec.source, stations };
+      } catch (err) {
+        if (spec.required) throw err;
+        console.warn(`Skipping optional charger source ${spec.source}:`, err);
+        return null;
+      }
+    }),
+  );
   const out: ChargerStation[] = [];
-  for (const { stations } of loaded) {
+  for (const loadedSource of loaded) {
+    if (!loadedSource) continue;
+    const { stations } = loadedSource;
     for (const s of stations) {
       s.kind = inferKind(s);
       out.push(s);

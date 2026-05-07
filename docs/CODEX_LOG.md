@@ -17,3 +17,21 @@ Skipped:
 Blocked:
 - Nothing yet.
 
+## 2026-05-07 — IRVE ingest
+
+What I did:
+- Added `v2/scripts/ingest_irve.py` for the official French IRVE consolidated CSV.
+- The script downloads the 2026-05-06 resource via `curl.exe`, caches it under `data/`, aggregates point-of-charge rows into station records, drops Tesla rows, and writes `v2/frontend/public/data/chargers_irve.json`.
+- Wired `chargers_irve.json` into `loadAllStations()` as an optional source, so the frontend still works before the IRVE output exists.
+- Ran the ingest successfully. Output: 63,217 station records from 224,577 raw rows. Dropped 9,063 Tesla rows. Fast / slow / unknown: 18,204 / 45,013 / 0. Missing open date: 22,146.
+
+Decisions:
+- Aggregated by `id_station_itinerance` because the frontend currently renders stations, not individual plugs.
+- Used max `puissance_nominale` for station `power_kw`, earliest `date_mise_en_service` for station `open_date`, and distinct point IDs for `stall_count`.
+- Gitignored large national JSON outputs while keeping the small Tesla output trackable.
+
+Skipped:
+- No deeper station/operator cleanup beyond light canonicalization. The raw operator fields are carried through for later inspection.
+
+Blocked:
+- Nothing.
