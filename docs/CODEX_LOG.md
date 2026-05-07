@@ -125,6 +125,27 @@ Skipped:
 Blocked:
 - Nothing expected for the local 2030 prototype build.
 
+## 2026-05-07 — Compute scaffolding
+
+What I did:
+- Added non-visual frontend compute/data modules:
+  - `src/data/filters.ts` for reusable station filtering by dataset/mode/year.
+  - `src/compute/webgpu.ts` for WebGPU support/device checks.
+  - `src/compute/populationGrid.ts` for loading the 0.25° prototype population binary.
+  - `src/compute/spatialIndex.ts` for a basic lat/lon charger grid index and haversine lookup.
+  - `src/compute/coveragePrototype.ts` for CPU prototype coverage stats on the coarse grid.
+
+Decisions:
+- Did not wire these into UI yet, because current visual files are dirty and visual/layout changes should be isolated.
+- The CPU prototype is intentionally for correctness/debug only. It is not the final WebGPU path and will be too slow for repeated interactive full-world updates.
+
+Skipped:
+- No shader or globe overlay yet.
+- No Rust/WASM crate yet.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — V2 data validator
 
 What I did:
