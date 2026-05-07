@@ -106,6 +106,22 @@ Skipped:
 Blocked:
 - Nothing expected.
 
+## 2026-05-07 — V2 data validator
+
+What I did:
+- Added `v2/scripts/validate_v2_data.py` to validate generated V2 data files and print explicit statistics.
+- Ran the validator successfully. Current totals: 263,697 station records, 0 validation failures. Station files: Tesla 8,962; BNetzA 105,381; IRVE 63,217; AFDC 86,137; Nobil missing optional. EV stock: 30 countries, 376 rows, 2010-2024. Station summary counts match.
+
+Decisions:
+- Validator checks required station files, optional national files, EV stock, and station summary consistency.
+- It reports row counts, country/network counts, missing open dates, duplicate IDs, kind distribution, and summary count mismatches.
+
+Skipped:
+- It does not validate future coverage/population math because those layers are not built yet.
+
+Blocked:
+- Nothing expected.
+
 ## 2026-05-07 — Nobil ingest scaffold
 
 What I did:
