@@ -73,3 +73,22 @@ export interface StationSummary {
   countries: Record<string, StationSummaryBucket>;
   networks: Record<string, StationSummaryNetwork>;
 }
+
+export interface PopulationGridMeta {
+  generated_at: string;
+  source: string;
+  epoch: number;
+  grid: string;
+  cell_degrees: number;
+  width: number;
+  height: number;
+  dtype: "float32";
+  byte_order: string;
+  bounds: { west: number; south: number; east: number; north: number };
+  layout: string;
+  population_sum: number;
+  nonzero_cells: number;
+  source_populated_cells: number;
+  skipped_source_cells: number;
+  notes: string[];
+}

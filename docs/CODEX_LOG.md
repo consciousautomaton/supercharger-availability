@@ -106,11 +106,31 @@ Skipped:
 Blocked:
 - Nothing expected.
 
+## 2026-05-07 — Population layer prototype script
+
+What I did:
+- Added `v2/scripts/build_population_layer.py` for a first coarse global population grid.
+- Added `PopulationGridMeta` and `loadPopulationGridMeta()` for later frontend/WebGPU work.
+- Ran the 2030 prototype build successfully. Output: `pop_025deg_world_2030.bin` at 1440x720 float32 cells, 4.0 MiB. Source cells: 370,272,898. Population sum: 8,480,668,252. Nonzero output cells: 156,933 / 1,036,800. Skipped source cells: 0. Runtime: 21.6s.
+
+Decisions:
+- Used existing mmap-friendly `data/npy/lons.npy`, `lats.npy`, and `pop.npy` arrays instead of rereading the 6.6 GB GeoTIFF directly.
+- The current output target is a 0.25-degree global equirectangular grid for 2030. This is a WebGPU prototype payload, not the final 1 km / 100 m V2 population layer.
+- Script processes in chunks and prints progress every ~25M source cells to avoid the previous black-box long-script problem.
+
+Skipped:
+- Did not implement downloads for 2010/2015/2020/2025 GHS-POP epochs yet.
+- Did not generate 100 m regional streams yet.
+
+Blocked:
+- Nothing expected for the local 2030 prototype build.
+
 ## 2026-05-07 — V2 data validator
 
 What I did:
 - Added `v2/scripts/validate_v2_data.py` to validate generated V2 data files and print explicit statistics.
 - Ran the validator successfully. Current totals: 263,697 station records, 0 validation failures. Station files: Tesla 8,962; BNetzA 105,381; IRVE 63,217; AFDC 86,137; Nobil missing optional. EV stock: 30 countries, 376 rows, 2010-2024. Station summary counts match.
+- Extended the validator to check the 0.25° population grid output size and metadata population sum.
 
 Decisions:
 - Validator checks required station files, optional national files, EV stock, and station summary consistency.

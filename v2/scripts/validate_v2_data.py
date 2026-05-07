@@ -15,6 +15,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = ROOT / "v2/frontend/public/data"
 
@@ -179,14 +181,43 @@ def validate_station_summary(expected_station_total: int) -> int:
     return failures
 
 
+def validate_population_grid() -> int:
+    meta_path = DATA_DIR / "pop_025deg_world_2030_meta.json"
+    bin_path = DATA_DIR / "pop_025deg_world_2030.bin"
+    if not meta_path.exists() or not bin_path.exists():
+        print("Population grid: missing optional pop_025deg_world_2030 outputs", file=sys.stderr)
+        return 0
+    meta = load_json(meta_path)
+    failures = 0
+    width = int(meta.get("width", 0))
+    height = int(meta.get("height", 0))
+    expected_bytes = width * height * 4
+    actual_bytes = bin_path.stat().st_size
+    if expected_bytes != actual_bytes:
+        failures += 1
+    arr = np.fromfile(bin_path, dtype=np.float32)
+    nonzero = int(np.count_nonzero(arr))
+    pop_sum = float(arr.sum(dtype=np.float64))
+    meta_sum = float(meta.get("population_sum", 0.0))
+    rel_err = abs(pop_sum - meta_sum) / meta_sum if meta_sum else 0.0
+    if rel_err > 1e-6:
+        failures += 1
+    print(
+        f"Population grid: cells={width * height:,} nonzero={nonzero:,} "
+        f"sum={pop_sum:,.0f} rel_err={rel_err:.2e} bytes={actual_bytes:,} errors={failures:,}",
+        file=sys.stderr,
+    )
+    return failures
+
+
 def main() -> int:
     station_total, failures = validate_stations()
     failures += validate_ev_stock()
     failures += validate_station_summary(station_total)
+    failures += validate_population_grid()
     print(f"[done] station_total={station_total:,} failures={failures:,}", file=sys.stderr)
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

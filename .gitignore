@@ -20,6 +20,7 @@ data/npy/
 # Computed outputs
 *.bin
 *.npy
+!v2/frontend/public/data/pop_025deg_world_2030.bin
 
 # V1 frontend generated outputs
 frontend/tiles/

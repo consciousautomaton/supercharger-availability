@@ -129,7 +129,7 @@ Last updated: 2026-05-07.
   - [~] UK NCR archive — decommissioned; archived data available only on request, so skipped for this shift.
   - Frontend pipeline is source-agnostic: each new ingest auto-merges via `loadAllStations()` once added to the loader.
 - [ ] Phase 4 — OCM "Today" spine
-- [~] **Phase 5 — EV adoption + year-matched population.** Done: `ingest_iea_ev_stock.py` → `ev_stock_country_year.json` (30 countries, 2010-2024, total stock only via OWID/IEA). Pending: BEV/PHEV split, GHS-POP 2010/2015/2020/2025/2030 epoch processing, country population by year.
+- [~] **Phase 5 — EV adoption + year-matched population.** Done: `ingest_iea_ev_stock.py` → `ev_stock_country_year.json` (30 countries, 2010-2024, total stock only via OWID/IEA); `build_population_layer.py` → `pop_025deg_world_2030.bin` (0.25° global prototype grid, 8.48B pop sum). Pending: BEV/PHEV split, GHS-POP 2010/2015/2020/2025/2030 epoch processing, 1 km / 100 m population pipeline, country population by year.
 - [~] **Phase 6 — Stats and polish.** Done: `build_station_summary.py` → `station_summary.json` for station counts by country/network/power tier/year. Pending: actual UI wiring, country selector behavior, computed coverage stats, visual polish.
 - [ ] Phase 7 — Hosting
 
