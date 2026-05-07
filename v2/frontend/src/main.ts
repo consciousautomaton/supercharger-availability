@@ -13,6 +13,12 @@ import {
   loadStationSummary,
 } from "./data/loader";
 import { filterStationsForState } from "./data/filters";
+import {
+  createCoverageGPU,
+  type CoverageDispatchResult,
+  type CoverageGPU,
+} from "./compute/coverageGPU";
+import { loadPopulationGrid2030 } from "./compute/populationGrid";
 import type {
   AppState,
   ChargerStation,
@@ -44,6 +50,11 @@ let totalCount = 0;
 let countryCatalog: CountryCatalog | null = null;
 let stationSummary: StationSummary | null = null;
 let evStock: EVStockCountryYear | null = null;
+let coveragePipelinePromise: Promise<CoverageGPU | null> | null = null;
+let latestCoverage: CoverageDispatchResult | null = null;
+let coverageLoading = false;
+let coverageDispatchSeq = 0;
+let coverageError: string | null = null;
 const controls = bindControls(currentState, applyState);
 syncControlsFromState(currentState);
 
@@ -98,6 +109,7 @@ function renderStats(state: AppState, visibleCount: number): void {
   statsEl.innerHTML = `
     <section class="stat-block">
       <h2>${scopeLabel}</h2>
+      ${renderCoverageLine(state)}
       <p><strong>${fmtNumber(visibleCount)}</strong> visible charging stations${yearText}</p>
       <p class="placeholder">${dataLine || `${fmtNumber(totalCount)} loaded across all sources`}</p>
       ${timelineNote}
@@ -109,6 +121,73 @@ function renderStats(state: AppState, visibleCount: number): void {
   `;
 }
 
+function renderCoverageLine(state: AppState): string {
+  if (state.region !== "world") {
+    return `<p class="coverage-line coverage-pending">Country-level coverage stat coming after country masking lands.</p>`;
+  }
+  if (coverageError) {
+    return `<p class="coverage-line coverage-pending">Coverage unavailable: ${escapeHtml(coverageError)}</p>`;
+  }
+  if (coverageLoading || !latestCoverage) {
+    return `<p class="coverage-line coverage-pending">Computing coverage on GPU…</p>`;
+  }
+  const pct = (latestCoverage.fractionCovered * 100).toFixed(1);
+  const coveredM = (latestCoverage.coveredPop / 1_000_000).toFixed(0);
+  const totalM = (latestCoverage.totalPop / 1_000_000).toFixed(0);
+  return `<p class="coverage-line"><strong>${pct}%</strong> of world population within ${state.distance_km} km of a charger<span class="coverage-detail">${coveredM} M of ${totalM} M people · GPU ${latestCoverage.dispatchMs.toFixed(0)} ms</span></p>`;
+}
+
+async function getCoveragePipeline(): Promise<CoverageGPU | null> {
+  if (!coveragePipelinePromise) {
+    coveragePipelinePromise = (async () => {
+      try {
+        const pop = await loadPopulationGrid2030();
+        return await createCoverageGPU(pop, allStations);
+      } catch (err) {
+        coverageError = err instanceof Error ? err.message : String(err);
+        console.warn("[v2] coverage pipeline init failed:", err);
+        return null;
+      }
+    })();
+  }
+  return coveragePipelinePromise;
+}
+
+async function refreshCoverage(state: AppState): Promise<void> {
+  if (state.region !== "world") {
+    latestCoverage = null;
+    coverageLoading = false;
+    return;
+  }
+  if (allStations.length === 0) return;
+  const pipeline = await getCoveragePipeline();
+  if (!pipeline) {
+    rerenderCurrentStats();
+    return;
+  }
+  const seq = ++coverageDispatchSeq;
+  coverageLoading = true;
+  rerenderCurrentStats();
+  try {
+    const result = await pipeline.dispatch(state);
+    if (seq !== coverageDispatchSeq) return; // superseded
+    latestCoverage = result;
+    coverageLoading = false;
+    rerenderCurrentStats();
+  } catch (err) {
+    if (seq !== coverageDispatchSeq) return;
+    coverageError = err instanceof Error ? err.message : String(err);
+    coverageLoading = false;
+    rerenderCurrentStats();
+  }
+}
+
+function rerenderCurrentStats(): void {
+  if (!updatePoints) return;
+  const visible = filterStationsForState(allStations, currentState).length;
+  renderStats(currentState, visible);
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -118,12 +197,27 @@ function escapeHtml(s: string): string {
 }
 
 function applyState(state: AppState): void {
+  const previous = currentState;
   currentState = state;
   writeStateToHash(state);
   if (updatePoints) {
     const visible = updatePoints(state);
     renderStats(state, visible);
   }
+  if (allStations.length > 0 && coverageInputsChanged(previous, state)) {
+    void refreshCoverage(state);
+  }
+}
+
+function coverageInputsChanged(a: AppState, b: AppState): boolean {
+  return (
+    a.region !== b.region ||
+    a.dataset !== b.dataset ||
+    a.mode !== b.mode ||
+    a.year !== b.year ||
+    a.distance_km !== b.distance_km ||
+    a.network_id !== b.network_id
+  );
 }
 
 Promise.all([
@@ -151,6 +245,7 @@ Promise.all([
     totalCount = stations.length;
     updatePoints = attachPoints(globe, stations);
     applyState(currentState);
+    void refreshCoverage(currentState);
     console.info(`[v2] loaded ${stations.length.toLocaleString()} stations`);
   })
   .catch((err) => {
