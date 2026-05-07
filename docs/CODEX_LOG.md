@@ -35,3 +35,20 @@ Skipped:
 
 Blocked:
 - Nothing.
+
+## 2026-05-07 — Nobil ingest scaffold
+
+What I did:
+- Added `v2/scripts/ingest_nobil.py` for Norway's Nobil datadump API.
+- Wired `chargers_nobil.json` into the frontend loader as an optional source.
+
+Decisions:
+- The script accepts either `NOBIL_API_KEY`, `data/nobil_api_key.txt`, or a pre-downloaded `data/nobil_datadump.json`.
+- It exits with a clear blocked message and no output when no key/cache is present.
+- Kept parsing defensive because Nobil payloads can vary between API versions; the script handles common station/position/connector field names and logs output counters.
+
+Skipped:
+- Did not use the public documentation example API key. Nobil says users should register and accept the CC BY terms, so this should wait for the user's own key or dump.
+
+Blocked:
+- Nobil datadump requires an API key or cached JSON file.
