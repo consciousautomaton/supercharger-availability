@@ -36,6 +36,21 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-07 — UK NCR checked and skipped
+
+What I did:
+- Checked current UK National Chargepoint Registry availability.
+- Confirmed the registry was decommissioned on 2024-11-28 and the archive is available only on request.
+
+Decisions:
+- Skipped UK NCR for this shift, matching the V2 brief's instruction not to block on manual archive access.
+
+Skipped:
+- No UK ingest script yet. A future script should be written once the user has an archive file or a replacement open-data source with install dates.
+
+Blocked:
+- Archived NCR data requires a manual request.
+
 ## 2026-05-07 — Nobil ingest scaffold
 
 What I did:
