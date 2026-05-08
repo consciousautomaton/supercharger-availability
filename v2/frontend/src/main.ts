@@ -19,6 +19,10 @@ import {
   type CoverageGPU,
 } from "./compute/coverageGPU";
 import { loadPopulationGrid2030 } from "./compute/populationGrid";
+import {
+  createCoverageLayer,
+  type CoverageLayer,
+} from "./globe/coverageLayer";
 import type {
   AppState,
   ChargerStation,
@@ -51,6 +55,7 @@ let countryCatalog: CountryCatalog | null = null;
 let stationSummary: StationSummary | null = null;
 let evStock: EVStockCountryYear | null = null;
 let coveragePipelinePromise: Promise<CoverageGPU | null> | null = null;
+let coverageLayer: CoverageLayer | null = null;
 let latestCoverage: CoverageDispatchResult | null = null;
 let coverageLoading = false;
 let coverageDispatchSeq = 0;
@@ -142,7 +147,10 @@ async function getCoveragePipeline(): Promise<CoverageGPU | null> {
     coveragePipelinePromise = (async () => {
       try {
         const pop = await loadPopulationGrid2030();
-        return await createCoverageGPU(pop, allStations);
+        const pipeline = await createCoverageGPU(pop, allStations);
+        coverageLayer = createCoverageLayer(pipeline.width, pipeline.height);
+        globe.add(coverageLayer.mesh);
+        return pipeline;
       } catch (err) {
         coverageError = err instanceof Error ? err.message : String(err);
         console.warn("[v2] coverage pipeline init failed:", err);
@@ -173,6 +181,7 @@ async function refreshCoverage(state: AppState): Promise<void> {
     if (seq !== coverageDispatchSeq) return; // superseded
     latestCoverage = result;
     coverageLoading = false;
+    if (coverageLayer) coverageLayer.setMask(result.coveredMask);
     rerenderCurrentStats();
   } catch (err) {
     if (seq !== coverageDispatchSeq) return;

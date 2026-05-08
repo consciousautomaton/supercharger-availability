@@ -265,6 +265,10 @@ export interface CoverageDispatchResult {
   fractionCovered: number;
   stationCount: number;
   dispatchMs: number;
+  // Per-cell mask, row-major equirect at (width × height). Each value is 0
+  // (uncovered or pop==0) or 1 (covered). Already converted to Uint8 so
+  // it can be uploaded directly as a Three.js DataTexture.
+  coveredMask: Uint8Array;
 }
 
 export interface CoverageGPU {
@@ -272,7 +276,6 @@ export interface CoverageGPU {
   width: number;
   height: number;
   dispatch(state: AppState): Promise<CoverageDispatchResult>;
-  readCoveredMask(): Promise<Uint32Array>;
   destroy(): void;
 }
 
@@ -340,6 +343,13 @@ export async function createCoverageGPU(
 
   const totalsReadback = device.createBuffer({
     size: 8,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
+  // Persistent mask readback buffer; we re-use it across dispatches so we
+  // don't pay buffer creation cost each frame.
+  const maskReadback = device.createBuffer({
+    size: cellTotal * 4,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
@@ -416,16 +426,32 @@ export async function createCoverageGPU(
     pass.dispatchWorkgroups(wgCount);
     pass.end();
     encoder.copyBufferToBuffer(totalsBuf, 0, totalsReadback, 0, 8);
+    encoder.copyBufferToBuffer(maskBuf, 0, maskReadback, 0, cellTotal * 4);
     device.queue.submit([encoder.finish()]);
     await device.queue.onSubmittedWorkDone();
     const dispatchMs = performance.now() - start;
 
-    await totalsReadback.mapAsync(GPUMapMode.READ);
-    const view = new Uint32Array(totalsReadback.getMappedRange().slice(0));
+    await Promise.all([
+      totalsReadback.mapAsync(GPUMapMode.READ),
+      maskReadback.mapAsync(GPUMapMode.READ),
+    ]);
+    const totalsView = new Uint32Array(
+      totalsReadback.getMappedRange().slice(0),
+    );
+    const maskU32 = new Uint32Array(maskReadback.getMappedRange().slice(0));
     totalsReadback.unmap();
+    maskReadback.unmap();
+
+    // Compact 1-per-cell Uint32 to 1-per-cell Uint8 (0 or 255) for direct
+    // use as a Three.js R8 DataTexture.
+    const maskU8 = new Uint8Array(cellTotal);
+    for (let i = 0; i < cellTotal; i += 1) {
+      maskU8[i] = maskU32[i] === 0 ? 0 : 255;
+    }
+
     // Shader accumulates kilopeople; multiply back to absolute people.
-    const coveredPop = view[0] * 1000;
-    const totalPop = view[1] * 1000;
+    const coveredPop = totalsView[0] * 1000;
+    const totalPop = totalsView[1] * 1000;
     const fractionCovered = totalPop > 0 ? coveredPop / totalPop : 0;
 
     return {
@@ -434,22 +460,8 @@ export async function createCoverageGPU(
       fractionCovered,
       stationCount: packed.count,
       dispatchMs,
+      coveredMask: maskU8,
     };
-  };
-
-  const readCoveredMask = async (): Promise<Uint32Array> => {
-    const readback = device.createBuffer({
-      size: cellTotal * 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
-    const encoder = device.createCommandEncoder();
-    encoder.copyBufferToBuffer(maskBuf, 0, readback, 0, cellTotal * 4);
-    device.queue.submit([encoder.finish()]);
-    await readback.mapAsync(GPUMapMode.READ);
-    const out = new Uint32Array(readback.getMappedRange().slice(0));
-    readback.unmap();
-    readback.destroy();
-    return out;
   };
 
   const destroy = (): void => {
@@ -459,6 +471,7 @@ export async function createCoverageGPU(
     maskBuf.destroy();
     totalsBuf.destroy();
     totalsReadback.destroy();
+    maskReadback.destroy();
     paramsBuf.destroy();
     device.destroy();
   };
@@ -468,7 +481,6 @@ export async function createCoverageGPU(
     width: meta.width,
     height: meta.height,
     dispatch,
-    readCoveredMask,
     destroy,
   };
 }
