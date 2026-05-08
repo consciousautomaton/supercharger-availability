@@ -321,6 +321,53 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-08 — Coverage layer on globe (Claude shift)
+
+What I did:
+- `coverageGPU.ts`: dispatch() now reads back per-cell mask alongside the
+  totals atomic, in a single submit. Uint32 covered values compacted to
+  Uint8 (0 or 255) for direct R8 DataTexture upload. Persistent
+  `maskReadback` buffer reused per dispatch.
+- New `globe/coverageLayer.ts`: SphereGeometry at GLOBE_RADIUS * 1.005
+  with custom ShaderMaterial. Fragment shader samples the mask texture,
+  discards uncovered cells, paints the rest with a uniform blue tint
+  (V2 palette `--accent`-ish, alpha 0.45). `discard` keeps the globe
+  surface visible underneath wherever covered == 0.
+- main.ts: creates the layer once the pipeline boots and parents it to
+  the three-globe root; calls setMask on each dispatch result.
+
+Decisions:
+- Three.js (WebGL2) and the WebGPU compute pipeline use different GPU
+  contexts, so the GPU-side mask buffer can't be sampled directly as a
+  Three texture. CPU readback (~1 MB at 0.25 deg) was simplest and adds
+  ~1-2 ms per dispatch. Acceptable at slider-driven recompute rates.
+- UV alignment: ThreeGlobe rotates its root by -PI/2 around Y so lon 0
+  sits at +Z. Children inherit that rotation, so default UV.x already
+  matches the pop grid (lon -180 -> u 0). V is flipped in shader because
+  WebGL's UnpackFlipY default for DataTexture puts data row 0 at the
+  bottom in UV space — verified empirically after two wrong-axis runs.
+- Tint hardcoded `vec3(0.122, 0.498, 0.941)` for first cut. Pop-density
+  alpha modulation and Timeline-mode hue ramp deferred per the brief's
+  visual spec until the shape is approved.
+
+Verified:
+- Locally and on production https://consciousautomaton.github.io/supercharger-availability/
+- Europe (dense) lights up over UK / France / Germany / Iberia / Italy /
+  Eastern Europe. Asia view: Eastern China / Japan / Korea / east AU.
+  All match the corresponding charger dot density. North Africa / Middle
+  East scattered as expected.
+- GPU dispatch + readback: ~600 ms cold, ~150-415 ms warm. Frame rate
+  stays at 60 fps.
+
+Skipped:
+- Pop-density alpha modulation (covered cells currently uniform 0.45
+  alpha regardless of population).
+- Timeline-mode hue ramp (year-of-coverage to color). Today mode only.
+- Country-mask GPU path (region != world still shows world coverage).
+
+Blocked:
+- Nothing.
+
 ## 2026-05-08 — First production deploy (Claude shift)
 
 What I did:
