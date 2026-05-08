@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "npm run build && gh-pages -d dist -b gh-pages"
   },
   "dependencies": {
     "three": "^0.171.0",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/three": "^0.171.0",
     "@webgpu/types": "^0.1.69",
+    "gh-pages": "^6.3.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }

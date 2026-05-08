@@ -86,7 +86,7 @@ export function createGlobe(container: HTMLElement): GlobeContext {
   globeMat.shininess = 4;
   scene.add(globe);
 
-  loadColorizedLandMask("/textures/earth-water.png")
+  loadColorizedLandMask(`${import.meta.env.BASE_URL}textures/earth-water.png`)
     .then((tex) => {
       globeMat.map = tex;
       globeMat.needsUpdate = true;

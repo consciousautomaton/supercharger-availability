@@ -1,4 +1,5 @@
 import type { PopulationGridMeta } from "../data/types";
+import { dataUrl } from "../data/paths";
 
 export interface LoadedPopulationGrid {
   meta: PopulationGridMeta;
@@ -13,9 +14,9 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export async function loadPopulationGrid2030(): Promise<LoadedPopulationGrid> {
   const meta = await fetchJson<PopulationGridMeta>(
-    "/data/pop_025deg_world_2030_meta.json",
+    dataUrl("pop_025deg_world_2030_meta.json"),
   );
-  const resp = await fetch("/data/pop_025deg_world_2030.bin");
+  const resp = await fetch(dataUrl("pop_025deg_world_2030.bin"));
   if (!resp.ok) {
     throw new Error(`Failed to load population grid binary: ${resp.status}`);
   }
