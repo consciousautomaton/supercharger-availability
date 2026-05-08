@@ -321,6 +321,53 @@ Skipped:
 Blocked:
 - Nothing.
 
+## 2026-05-08 — First production deploy (Claude shift)
+
+What I did:
+- Configured Vite `base` (default `/supercharger-availability/`, override via
+  `VITE_BASE`) so asset URLs resolve under the GitHub Pages subpath.
+- Added `src/data/paths.ts` with `dataUrl()` + `textureUrl()` helpers and
+  rewrote loader, populationGrid, and globe setup to use them.
+- Switched `npm run build` to `tsc --noEmit && vite build` so typecheck
+  doesn't silently emit .js next to .ts in src/.
+- Made repo public (was private; GH Pages free-tier blocks private repos)
+  and enabled Pages on the gh-pages branch via `gh api`.
+- First two deploy attempts via the `gh-pages` npm package published a
+  broken site: data/*.json and *.bin were missing because the package's
+  node_modules cache inherited the parent repo's .gitignore. The cache
+  itself also got committed back into the gh-pages branch.
+- Replaced the npm package with a local Node deploy script
+  (`v2/frontend/scripts/deploy.mjs`) that uses a temporary git worktree on
+  a fresh orphan gh-pages branch, wipes inherited files, copies dist/
+  contents, and force-pushes. Includes `public/.nojekyll` so GitHub Pages
+  skips Jekyll preprocessing.
+
+Decisions:
+- Private repo → public was acceptable per user (portfolio-style project,
+  code transparency is an asset for the recruiter audience).
+- Worktree-based deploy over the package because the package is
+  opinionated about cache and gitignore handling. Worktree is one-shot
+  and explicit.
+- `VITE_BASE` env override left in place so a future Vercel / CF / custom
+  domain switch is one variable change, no code edits.
+
+Skipped:
+- No CI auto-deploy. Each shift runs `npm run deploy` locally. Adding GH
+  Actions would require either committing the gitignored data files or
+  re-running ingests in CI; both are larger scope.
+- No mobile / Safari iOS testing. Per user: target is latest Mac/Windows
+  on 100 Mbit+. Mobile not in scope.
+
+Verified:
+- Live at https://consciousautomaton.github.io/supercharger-availability/
+  with globe, all four ingested sources, EV stock + station summary +
+  network/country catalogs, and the WebGPU coverage stat all loading and
+  computing in production. First-load GPU dispatch ~600 ms cold, ~400 ms
+  warm.
+
+Blocked:
+- Nothing.
+
 ## 2026-05-07 — WebGPU coverage pipeline (Claude shift)
 
 What I did:
