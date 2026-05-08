@@ -1,0 +1,15 @@
+{
+  "countries": 30,
+  "license": "CC BY 4.0; cite IEA and Our World in Data",
+  "notes": [
+    "Total electric car stock only; BEV/PHEV split is not available in this OWID chart.",
+    "Only ISO-A3 country rows are retained; regional aggregates are skipped."
+  ],
+  "original_source": "IEA Global EV Outlook 2025",
+  "raw_csv_url": "https://ourworldindata.org/grapher/electric-car-stocks.csv?v=1&csvType=full&useColumnShortNames=false",
+  "rows": 376,
+  "source": "Our World in Data electric-car-stocks, derived from IEA Global EV Outlook 2025",
+  "source_url": "https://ourworldindata.org/grapher/electric-car-stocks",
+  "year_max": 2024,
+  "year_min": 2010
+}

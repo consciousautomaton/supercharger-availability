@@ -1,0 +1,26 @@
+{
+  "bounds": {
+    "east": 180,
+    "north": 90,
+    "south": -90,
+    "west": -180
+  },
+  "byte_order": "little_endian",
+  "cell_degrees": 0.25,
+  "dtype": "float32",
+  "epoch": 2030,
+  "generated_at": "2026-05-07T16:07:30.274475+00:00",
+  "grid": "equirectangular_lonlat",
+  "height": 720,
+  "layout": "row_major_north_to_south",
+  "nonzero_cells": 156933,
+  "notes": [
+    "This is a coarse global prototype grid, not the final 1 km / 100 m V2 population pipeline.",
+    "Values are summed population per output lon/lat cell."
+  ],
+  "population_sum": 8480668252.099281,
+  "skipped_source_cells": 0,
+  "source": "GHS-POP 2030 populated-cell extract from data/npy",
+  "source_populated_cells": 370272898,
+  "width": 1440
+}
