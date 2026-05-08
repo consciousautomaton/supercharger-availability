@@ -49,6 +49,7 @@ frontend/unassigned_population_bins.geojson
 # V2 frontend build artifacts
 v2/frontend/node_modules/
 v2/frontend/dist/
+v2/frontend/.vite/
 
 # V2 large generated data (regenerable via v2/scripts/ingest_*.py)
 v2/frontend/public/data/chargers_bnetza.json
